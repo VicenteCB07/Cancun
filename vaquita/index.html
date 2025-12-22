@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaquita - Control de Gastos del Viaje</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a472a 0%, #2d5a3d 50%, #165B33 100%);
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                radial-gradient(circle at 20% 80%, rgba(255,255,255,0.1) 2px, transparent 2px),
+                radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1) 2px, transparent 2px),
+                radial-gradient(circle at 40% 40%, rgba(255,255,255,0.08) 1px, transparent 1px),
+                radial-gradient(circle at 60% 60%, rgba(255,255,255,0.08) 1px, transparent 1px),
+                radial-gradient(circle at 90% 90%, rgba(255,255,255,0.1) 2px, transparent 2px);
+            background-size: 100px 100px, 150px 150px, 80px 80px, 120px 120px, 200px 200px;
+            pointer-events: none;
+            z-index: 0;
+            animation: snowfall 20s linear infinite;
+        }
+
+        @keyframes snowfall {
+            0% { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; }
+            100% { background-position: 100px 100px, -150px 150px, 80px 80px, -120px 120px, 200px 200px; }
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            color: #FFD700;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        h1::before {
+            content: '🎄 ';
+        }
+
+        h1::after {
+            content: ' 🎄';
+        }
+
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .subtitle::after {
+            content: ' 🎅';
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            border: 2px solid rgba(200, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #c41e3a;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #c41e3a;
+            padding-bottom: 10px;
+        }
+
+        .card h2::before {
+            content: '🎁 ';
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #c41e3a;
+        }
+
+        button {
+            background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(196, 30, 58, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #f8f9fa;
+            color: #333;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .amount-positive {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .amount-negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .summary-item {
+            background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #FFD700;
+        }
+
+        .summary-item.green {
+            background: linear-gradient(135deg, #165B33 0%, #1a472a 100%);
+        }
+
+        .summary-item.red {
+            background: linear-gradient(135deg, #dc3545 0%, #ff6b6b 100%);
+        }
+
+        .summary-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .family-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 5px solid #c41e3a;
+            border-right: 5px solid #165B33;
+        }
+
+        .family-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .family-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .family-balance {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .family-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            text-align: center;
+        }
+
+        .detail-item {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .detail-label {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .detail-value {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            background: #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-familia {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .checkbox-familia:hover {
+            background: #e9ecef;
+        }
+
+        .checkbox-familia.selected {
+            background: linear-gradient(135deg, #165B33 0%, #1a472a 100%);
+            color: white;
+            border-color: #FFD700;
+        }
+
+        .checkbox-familia input {
+            width: auto;
+            cursor: pointer;
+        }
+
+        @media (max-width: 600px) {
+            .family-details {
+                grid-template-columns: 1fr;
+            }
+
+            .form-row {
+                flex-direction: column;
+            }
+
+            table {
+                font-size: 14px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Vaquita</h1>
+        <p class="subtitle">Control de gastos del viaje familiar</p>
+
+        <!-- Resumen General -->
+        <div class="card">
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div>Total Gastos</div>
+                    <div class="summary-value" id="totalGastos">$0.00</div>
+                </div>
+                <div class="summary-item">
+                    <div>Familias</div>
+                    <div class="summary-value" id="numFamilias">0</div>
+                </div>
+                <div class="summary-item">
+                    <div>Cuota por Familia</div>
+                    <div class="summary-value" id="cuotaFamilia">$0.00</div>
+                    <div style="font-size: 0.7em; margin-top: 5px; opacity: 0.9;" id="formulaCuota"></div>
+                </div>
+                <div class="summary-item green">
+                    <div>Total Recaudado</div>
+                    <div class="summary-value" id="totalAportes">$0.00</div>
+                </div>
+                <div class="summary-item" style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #333;">
+                    <div>💰 Saldo Vaquita</div>
+                    <div class="summary-value" id="saldoVaquita">$0.00</div>
+                    <div style="font-size: 0.7em; margin-top: 5px;" id="saldoVaquitaInfo"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gestionar Familias -->
+        <div class="card">
+            <h2>Familias</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Nombre de la Familia</label>
+                    <input type="text" id="nombreFamilia" placeholder="Ej: Familia Garcia">
+                </div>
+                <div class="form-group" style="flex: 0; display: flex; align-items: flex-end;">
+                    <button onclick="agregarFamilia()">Agregar Familia</button>
+                </div>
+            </div>
+            <div id="listaFamilias"></div>
+        </div>
+
+        <!-- Registro de Movimientos -->
+        <div class="card">
+            <h2>Registrar Movimiento</h2>
+            <div class="tabs">
+                <div class="tab active" onclick="cambiarTab('aporte')">Aporte</div>
+                <div class="tab" onclick="cambiarTab('gasto')">Gasto</div>
+            </div>
+
+            <div id="tab-aporte" class="tab-content active">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Familia</label>
+                        <select id="familiaAporte"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Monto</label>
+                        <input type="number" id="montoAporte" placeholder="0.00" step="0.01">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Concepto (opcional)</label>
+                        <input type="text" id="conceptoAporte" placeholder="Ej: Transferencia, Efectivo...">
+                    </div>
+                </div>
+                <button onclick="registrarAporte()">Registrar Aporte</button>
+            </div>
+
+            <div id="tab-gasto" class="tab-content">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>¿Quién pagó?</label>
+                        <select id="familiaGasto">
+                            <option value="">Seleccionar...</option>
+                            <option value="vaquita">💰 Desde la Vaquita (Tesorero)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Monto</label>
+                        <input type="number" id="montoGasto" placeholder="0.00" step="0.01">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Concepto</label>
+                        <input type="text" id="conceptoGasto" placeholder="Ej: Despensa, Renta carro, Gasolina...">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Familias que participan en este gasto</label>
+                        <div id="familiasParticipantes" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"></div>
+                        <button type="button" onclick="seleccionarTodas()" class="btn-secondary" style="margin-top: 10px;">Seleccionar Todas</button>
+                    </div>
+                </div>
+                <button onclick="registrarGasto()">Registrar Gasto</button>
+            </div>
+        </div>
+
+        <!-- Balance por Familia -->
+        <div class="card">
+            <h2>Balance por Familia</h2>
+            <p style="color: #666; margin-bottom: 15px;">
+                <strong>Positivo (+):</strong> Te deben (la familia aporto de mas o pago gastos) |
+                <strong>Negativo (-):</strong> Te debe (la familia no ha aportado lo suficiente)
+            </p>
+            <div id="balanceFamilias"></div>
+        </div>
+
+        <!-- Historial de Movimientos -->
+        <div class="card">
+            <h2>Historial de Movimientos</h2>
+            <div id="historialMovimientos"></div>
+        </div>
+
+        <!-- Acciones -->
+        <div class="card">
+            <h2>Acciones</h2>
+            <p style="color: #666; margin-bottom: 15px;">Exportar reporte:</p>
+            <div class="actions">
+                <button onclick="exportarCSV()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">📊 Exportar CSV</button>
+                <button onclick="exportarPDF()" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">📄 Exportar PDF</button>
+            </div>
+            <p style="color: #666; margin: 15px 0;">Respaldo de datos:</p>
+            <div class="actions">
+                <button onclick="exportarDatos()" class="btn-secondary">💾 Guardar Respaldo (JSON)</button>
+                <button onclick="importarDatos()" class="btn-secondary">📂 Cargar Respaldo</button>
+                <button onclick="limpiarTodo()" class="btn-danger">🗑️ Limpiar Todo</button>
+            </div>
+            <input type="file" id="importFile" style="display: none;" accept=".json" onchange="procesarImport(event)">
+        </div>
+    </div>
+
+    <script>
+        // Estado de la aplicacion
+        let estado = {
+            familias: [],
+            aportes: [],
+            gastos: []
+        };
+
+        // Cargar datos guardados
+        function cargarDatos() {
+            const guardado = localStorage.getItem('vaquita_datos');
+            if (guardado) {
+                estado = JSON.parse(guardado);
+            }
+            actualizarUI();
+        }
+
+        // Guardar datos
+        function guardarDatos() {
+            localStorage.setItem('vaquita_datos', JSON.stringify(estado));
+            autoRespaldo(); // Guardar respaldo automático
+        }
+
+        // Auto-respaldo: descarga automáticamente un archivo JSON
+        let respaldoPendiente = null;
+        function autoRespaldo() {
+            // Usar debounce para no descargar en cada cambio pequeño
+            clearTimeout(respaldoPendiente);
+            respaldoPendiente = setTimeout(() => {
+                const dataStr = JSON.stringify(estado, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'vaquita_backup.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                console.log('✅ Auto-respaldo guardado: vaquita_backup.json');
+            }, 1000); // Esperar 1 segundo después del último cambio
+        }
+
+        // Agregar familia
+        function agregarFamilia() {
+            const nombre = document.getElementById('nombreFamilia').value.trim();
+            if (!nombre) {
+                alert('Por favor ingresa el nombre de la familia');
+                return;
+            }
+            if (estado.familias.find(f => f.nombre.toLowerCase() === nombre.toLowerCase())) {
+                alert('Esta familia ya existe');
+                return;
+            }
+
+            estado.familias.push({
+                id: Date.now(),
+                nombre: nombre
+            });
+
+            document.getElementById('nombreFamilia').value = '';
+            guardarDatos();
+            actualizarUI();
+        }
+
+        // Eliminar familia
+        function eliminarFamilia(id) {
+            const familia = estado.familias.find(f => f.id === id);
+            if (!confirm(`¿Eliminar a ${familia.nombre}? Se eliminaran sus aportes y gastos.`)) return;
+
+            estado.familias = estado.familias.filter(f => f.id !== id);
+            estado.aportes = estado.aportes.filter(a => a.familiaId !== id);
+            estado.gastos = estado.gastos.filter(g => g.familiaId !== id);
+
+            guardarDatos();
+            actualizarUI();
+        }
+
+        // Cambiar tab
+        function cambiarTab(tipo) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tipo}`).classList.add('active');
+        }
+
+        // Registrar aporte
+        function registrarAporte() {
+            const familiaId = parseInt(document.getElementById('familiaAporte').value);
+            const monto = parseFloat(document.getElementById('montoAporte').value);
+            const concepto = document.getElementById('conceptoAporte').value.trim();
+
+            if (!familiaId) {
+                alert('Selecciona una familia');
+                return;
+            }
+            if (!monto || monto <= 0) {
+                alert('Ingresa un monto valido');
+                return;
+            }
+
+            estado.aportes.push({
+                id: Date.now(),
+                familiaId: familiaId,
+                monto: monto,
+                concepto: concepto || 'Aporte',
+                fecha: new Date().toISOString()
+            });
+
+            document.getElementById('montoAporte').value = '';
+            document.getElementById('conceptoAporte').value = '';
+
+            guardarDatos();
+            actualizarUI();
+        }
+
+        // Registrar gasto
+        function registrarGasto() {
+            const pagadoPor = document.getElementById('familiaGasto').value;
+            const monto = parseFloat(document.getElementById('montoGasto').value);
+            const concepto = document.getElementById('conceptoGasto').value.trim();
+
+            // Obtener familias participantes
+            const checkboxes = document.querySelectorAll('#familiasParticipantes input[type="checkbox"]:checked');
+            const participantes = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+            if (!pagadoPor) {
+                alert('Selecciona quien pago');
+                return;
+            }
+            if (!monto || monto <= 0) {
+                alert('Ingresa un monto valido');
+                return;
+            }
+            if (!concepto) {
+                alert('Ingresa el concepto del gasto');
+                return;
+            }
+            if (participantes.length === 0) {
+                alert('Selecciona al menos una familia que participa en este gasto');
+                return;
+            }
+
+            // Verificar si es desde la vaquita
+            const desdeVaquita = pagadoPor === 'vaquita';
+            const familiaId = desdeVaquita ? null : parseInt(pagadoPor);
+
+            // Si es desde vaquita, verificar que hay saldo suficiente
+            if (desdeVaquita) {
+                const saldoVaquita = calcularSaldoVaquita();
+                if (monto > saldoVaquita) {
+                    alert(`No hay suficiente saldo en la vaquita. Disponible: ${formatearMoneda(saldoVaquita)}`);
+                    return;
+                }
+            }
+
+            estado.gastos.push({
+                id: Date.now(),
+                familiaId: familiaId,
+                desdeVaquita: desdeVaquita,
+                monto: monto,
+                concepto: concepto,
+                participantes: participantes,
+                fecha: new Date().toISOString()
+            });
+
+            document.getElementById('montoGasto').value = '';
+            document.getElementById('conceptoGasto').value = '';
+
+            guardarDatos();
+            actualizarUI();
+        }
+
+        // Calcular saldo disponible en la vaquita
+        function calcularSaldoVaquita() {
+            const totalAportes = estado.aportes.reduce((sum, a) => sum + a.monto, 0);
+            const gastosDesdeVaquita = estado.gastos
+                .filter(g => g.desdeVaquita)
+                .reduce((sum, g) => sum + g.monto, 0);
+            return totalAportes - gastosDesdeVaquita;
+        }
+
+        // Seleccionar todas las familias
+        function seleccionarTodas() {
+            const checkboxes = document.querySelectorAll('#familiasParticipantes input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => {
+                cb.checked = !allChecked;
+                cb.parentElement.classList.toggle('selected', !allChecked);
+            });
+        }
+
+        // Toggle checkbox familia
+        function toggleFamiliaParticipante(checkbox) {
+            checkbox.parentElement.classList.toggle('selected', checkbox.checked);
+        }
+
+        // Eliminar movimiento
+        function eliminarMovimiento(tipo, id) {
+            if (!confirm('¿Eliminar este movimiento?')) return;
+
+            if (tipo === 'aporte') {
+                estado.aportes = estado.aportes.filter(a => a.id !== id);
+            } else {
+                estado.gastos = estado.gastos.filter(g => g.id !== id);
+            }
+
+            guardarDatos();
+            actualizarUI();
+        }
+
+        // Calcular totales
+        function calcularTotales() {
+            const totalGastos = estado.gastos.reduce((sum, g) => sum + g.monto, 0);
+            const totalAportes = estado.aportes.reduce((sum, a) => sum + a.monto, 0);
+            const numFamilias = estado.familias.length;
+            const cuotaFamilia = numFamilias > 0 ? totalGastos / numFamilias : 0;
+
+            return { totalGastos, totalAportes, cuotaFamilia, numFamilias };
+        }
+
+        // Calcular balance por familia
+        function calcularBalanceFamilia(familiaId) {
+            const aportes = estado.aportes
+                .filter(a => a.familiaId === familiaId)
+                .reduce((sum, a) => sum + a.monto, 0);
+
+            // Solo contar gastos pagados por esta familia (no desde vaquita)
+            const gastosPagados = estado.gastos
+                .filter(g => g.familiaId === familiaId && !g.desdeVaquita)
+                .reduce((sum, g) => sum + g.monto, 0);
+
+            // Calcular cuota: sumar la parte proporcional de cada gasto donde participa
+            // Solo para gastos NO pagados desde la vaquita (esos ya están cubiertos con aportes)
+            let cuotaGastosFamilia = 0;
+            estado.gastos.forEach(g => {
+                if (g.desdeVaquita) return; // Los gastos desde vaquita no generan deuda adicional
+
+                const participantes = g.participantes || estado.familias.map(f => f.id);
+                if (participantes.includes(familiaId)) {
+                    cuotaGastosFamilia += g.monto / participantes.length;
+                }
+            });
+
+            // Balance = Aportes + Gastos pagados por la familia - Cuota de gastos pagados por familias
+            // Positivo = le debo dinero (aporto de mas o pago gastos)
+            // Negativo = me debe dinero (no ha aportado lo suficiente)
+            const balance = aportes + gastosPagados - cuotaGastosFamilia;
+
+            return { aportes, gastosPagados, cuotaFamilia: cuotaGastosFamilia, balance };
+        }
+
+        // Actualizar UI
+        function actualizarUI() {
+            const { totalGastos, totalAportes, cuotaFamilia, numFamilias } = calcularTotales();
+
+            // Actualizar resumen
+            document.getElementById('totalGastos').textContent = formatearMoneda(totalGastos);
+            document.getElementById('totalAportes').textContent = formatearMoneda(totalAportes);
+            document.getElementById('cuotaFamilia').textContent = formatearMoneda(cuotaFamilia);
+            document.getElementById('numFamilias').textContent = numFamilias;
+            document.getElementById('formulaCuota').textContent = numFamilias > 0
+                ? `${formatearMoneda(totalGastos)} / ${numFamilias} familias`
+                : '';
+
+            // Saldo de la vaquita
+            const saldoVaquita = calcularSaldoVaquita();
+            const gastadoVaquita = estado.gastos.filter(g => g.desdeVaquita).reduce((sum, g) => sum + g.monto, 0);
+            document.getElementById('saldoVaquita').textContent = formatearMoneda(saldoVaquita);
+            document.getElementById('saldoVaquitaInfo').textContent = gastadoVaquita > 0
+                ? `Gastado: ${formatearMoneda(gastadoVaquita)}`
+                : 'Disponible para gastos';
+
+            // Actualizar selectores de familias
+            const optionsFamilias = estado.familias.map(f =>
+                `<option value="${f.id}">${f.nombre}</option>`
+            ).join('');
+
+            document.getElementById('familiaAporte').innerHTML =
+                '<option value="">Seleccionar...</option>' + optionsFamilias;
+
+            // Selector de gasto incluye opción de vaquita con saldo
+            document.getElementById('familiaGasto').innerHTML =
+                '<option value="">Seleccionar...</option>' +
+                `<option value="vaquita">💰 Desde la Vaquita (${formatearMoneda(saldoVaquita)} disponible)</option>` +
+                optionsFamilias;
+
+            // Checkboxes de familias participantes
+            document.getElementById('familiasParticipantes').innerHTML = estado.familias.map(f => `
+                <label class="checkbox-familia selected">
+                    <input type="checkbox" value="${f.id}" checked onchange="toggleFamiliaParticipante(this)">
+                    ${f.nombre}
+                </label>
+            `).join('');
+
+            // Lista de familias
+            if (estado.familias.length === 0) {
+                document.getElementById('listaFamilias').innerHTML =
+                    '<div class="empty-state">No hay familias registradas</div>';
+            } else {
+                document.getElementById('listaFamilias').innerHTML = estado.familias.map(f => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                        <span style="font-weight: 500;">${f.nombre}</span>
+                        <button class="btn-danger" onclick="eliminarFamilia(${f.id})">Eliminar</button>
+                    </div>
+                `).join('');
+            }
+
+            // Balance por familia
+            if (estado.familias.length === 0) {
+                document.getElementById('balanceFamilias').innerHTML =
+                    '<div class="empty-state">Agrega familias para ver el balance</div>';
+            } else {
+                document.getElementById('balanceFamilias').innerHTML = estado.familias.map(f => {
+                    const balance = calcularBalanceFamilia(f.id);
+                    const balanceClass = balance.balance >= 0 ? 'amount-positive' : 'amount-negative';
+                    const balanceTexto = balance.balance >= 0 ? 'Le debes' : 'Te debe';
+
+                    return `
+                        <div class="family-card">
+                            <div class="family-header">
+                                <span class="family-name">${f.nombre}</span>
+                                <span class="family-balance ${balanceClass}">
+                                    ${balanceTexto}: ${formatearMoneda(Math.abs(balance.balance))}
+                                </span>
+                            </div>
+                            <div class="family-details">
+                                <div class="detail-item">
+                                    <div class="detail-label">Aportes</div>
+                                    <div class="detail-value">${formatearMoneda(balance.aportes)}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Gastos Pagados</div>
+                                    <div class="detail-value">${formatearMoneda(balance.gastosPagados)}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Cuota</div>
+                                    <div class="detail-value">${formatearMoneda(balance.cuotaFamilia)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Historial de movimientos
+            const movimientos = [
+                ...estado.aportes.map(a => ({ ...a, tipo: 'aporte' })),
+                ...estado.gastos.map(g => ({ ...g, tipo: 'gasto' }))
+            ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+            if (movimientos.length === 0) {
+                document.getElementById('historialMovimientos').innerHTML =
+                    '<div class="empty-state">No hay movimientos registrados</div>';
+            } else {
+                document.getElementById('historialMovimientos').innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Familia</th>
+                                <th>Tipo</th>
+                                <th>Concepto</th>
+                                <th>Monto</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${movimientos.map(m => {
+                                const familia = estado.familias.find(f => f.id === m.familiaId);
+                                const fecha = new Date(m.fecha).toLocaleDateString('es-MX');
+                                const tipoClass = m.tipo === 'aporte' ? 'amount-positive' : '';
+
+                                // Nombre de quien pagó
+                                let pagadoPor = familia ? familia.nombre : 'Eliminada';
+                                if (m.tipo === 'gasto' && m.desdeVaquita) {
+                                    pagadoPor = '💰 Vaquita';
+                                }
+
+                                // Para gastos, mostrar participantes
+                                let participantesInfo = '';
+                                if (m.tipo === 'gasto' && m.participantes) {
+                                    const numParticipantes = m.participantes.length;
+                                    const nombresParticipantes = m.participantes
+                                        .map(id => estado.familias.find(f => f.id === id)?.nombre || '?')
+                                        .join(', ');
+                                    participantesInfo = `<br><small style="color: #666;">${numParticipantes} fam: ${nombresParticipantes}</small>`;
+                                }
+
+                                return `
+                                    <tr>
+                                        <td>${fecha}</td>
+                                        <td>${pagadoPor}</td>
+                                        <td>${m.tipo === 'aporte' ? 'Aporte' : 'Gasto'}</td>
+                                        <td>${m.concepto}${participantesInfo}</td>
+                                        <td class="${tipoClass}">${formatearMoneda(m.monto)}</td>
+                                        <td>
+                                            <button class="btn-danger" onclick="eliminarMovimiento('${m.tipo}', ${m.id})">X</button>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+        }
+
+        // Formatear moneda
+        function formatearMoneda(valor) {
+            return new Intl.NumberFormat('es-MX', {
+                style: 'currency',
+                currency: 'MXN'
+            }).format(valor);
+        }
+
+        // Exportar datos JSON (respaldo)
+        function exportarDatos() {
+            const dataStr = JSON.stringify(estado, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vaquita_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Exportar a CSV
+        function exportarCSV() {
+            const { totalGastos, totalAportes } = calcularTotales();
+            const saldoVaquita = calcularSaldoVaquita();
+
+            // Crear contenido CSV
+            let csv = '\ufeff'; // BOM para Excel
+            csv += 'REPORTE VAQUITA - VIAJE FAMILIAR\n';
+            csv += `Fecha de reporte:,${new Date().toLocaleDateString('es-MX')}\n\n`;
+
+            // Resumen
+            csv += 'RESUMEN GENERAL\n';
+            csv += `Total Gastos:,${totalGastos.toFixed(2)}\n`;
+            csv += `Total Recaudado:,${totalAportes.toFixed(2)}\n`;
+            csv += `Saldo Vaquita:,${saldoVaquita.toFixed(2)}\n\n`;
+
+            // Balance por familia
+            csv += 'BALANCE POR FAMILIA\n';
+            csv += 'Familia,Aportes,Gastos Pagados,Cuota,Balance,Estado\n';
+            estado.familias.forEach(f => {
+                const balance = calcularBalanceFamilia(f.id);
+                const estadoBalance = balance.balance >= 0 ? 'Le debes' : 'Te debe';
+                csv += `${f.nombre},${balance.aportes.toFixed(2)},${balance.gastosPagados.toFixed(2)},${balance.cuotaFamilia.toFixed(2)},${Math.abs(balance.balance).toFixed(2)},${estadoBalance}\n`;
+            });
+            csv += '\n';
+
+            // Movimientos
+            csv += 'HISTORIAL DE MOVIMIENTOS\n';
+            csv += 'Fecha,Familia/Origen,Tipo,Concepto,Monto,Participantes\n';
+
+            const movimientos = [
+                ...estado.aportes.map(a => ({ ...a, tipo: 'aporte' })),
+                ...estado.gastos.map(g => ({ ...g, tipo: 'gasto' }))
+            ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+            movimientos.forEach(m => {
+                const familia = estado.familias.find(f => f.id === m.familiaId);
+                let origen = familia ? familia.nombre : 'Eliminada';
+                if (m.tipo === 'gasto' && m.desdeVaquita) origen = 'Vaquita';
+
+                let participantes = '';
+                if (m.tipo === 'gasto' && m.participantes) {
+                    participantes = m.participantes
+                        .map(id => estado.familias.find(f => f.id === id)?.nombre || '?')
+                        .join(' | ');
+                }
+
+                const fecha = new Date(m.fecha).toLocaleDateString('es-MX');
+                const concepto = m.concepto.replace(/,/g, ';'); // Escapar comas
+                csv += `${fecha},${origen},${m.tipo === 'aporte' ? 'Aporte' : 'Gasto'},${concepto},${m.monto.toFixed(2)},${participantes}\n`;
+            });
+
+            // Descargar
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vaquita_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Exportar a PDF
+        function exportarPDF() {
+            const { totalGastos, totalAportes } = calcularTotales();
+            const saldoVaquita = calcularSaldoVaquita();
+
+            // Crear ventana para imprimir
+            const ventana = window.open('', '_blank');
+            ventana.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Reporte Vaquita</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                        h1 { color: #165B33; text-align: center; border-bottom: 3px solid #c41e3a; padding-bottom: 10px; }
+                        h2 { color: #c41e3a; margin-top: 30px; }
+                        .fecha { text-align: center; color: #666; margin-bottom: 30px; }
+                        .resumen { display: flex; justify-content: space-around; margin: 20px 0; flex-wrap: wrap; }
+                        .resumen-item { text-align: center; padding: 15px; background: #f5f5f5; border-radius: 8px; min-width: 150px; margin: 5px; }
+                        .resumen-item .valor { font-size: 1.5em; font-weight: bold; color: #165B33; }
+                        .resumen-item.gasto .valor { color: #c41e3a; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+                        th { background: #165B33; color: white; }
+                        tr:nth-child(even) { background: #f9f9f9; }
+                        .positivo { color: #28a745; font-weight: bold; }
+                        .negativo { color: #dc3545; font-weight: bold; }
+                        .footer { text-align: center; margin-top: 40px; color: #999; font-size: 12px; }
+                        @media print { body { padding: 0; } }
+                    </style>
+                </head>
+                <body>
+                    <h1>🎄 Reporte Vaquita - Viaje Familiar 🎄</h1>
+                    <p class="fecha">Generado el ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+
+                    <div class="resumen">
+                        <div class="resumen-item gasto">
+                            <div>Total Gastos</div>
+                            <div class="valor">${formatearMoneda(totalGastos)}</div>
+                        </div>
+                        <div class="resumen-item">
+                            <div>Total Recaudado</div>
+                            <div class="valor">${formatearMoneda(totalAportes)}</div>
+                        </div>
+                        <div class="resumen-item">
+                            <div>Saldo Vaquita</div>
+                            <div class="valor">${formatearMoneda(saldoVaquita)}</div>
+                        </div>
+                    </div>
+
+                    <h2>Balance por Familia</h2>
+                    <table>
+                        <tr>
+                            <th>Familia</th>
+                            <th>Aportes</th>
+                            <th>Gastos Pagados</th>
+                            <th>Cuota</th>
+                            <th>Balance</th>
+                        </tr>
+                        ${estado.familias.map(f => {
+                            const balance = calcularBalanceFamilia(f.id);
+                            const clase = balance.balance >= 0 ? 'positivo' : 'negativo';
+                            const texto = balance.balance >= 0 ? 'Le debes' : 'Te debe';
+                            return `
+                                <tr>
+                                    <td><strong>${f.nombre}</strong></td>
+                                    <td>${formatearMoneda(balance.aportes)}</td>
+                                    <td>${formatearMoneda(balance.gastosPagados)}</td>
+                                    <td>${formatearMoneda(balance.cuotaFamilia)}</td>
+                                    <td class="${clase}">${texto}: ${formatearMoneda(Math.abs(balance.balance))}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </table>
+
+                    <h2>Historial de Movimientos</h2>
+                    <table>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Origen</th>
+                            <th>Tipo</th>
+                            <th>Concepto</th>
+                            <th>Monto</th>
+                        </tr>
+                        ${[
+                            ...estado.aportes.map(a => ({ ...a, tipo: 'aporte' })),
+                            ...estado.gastos.map(g => ({ ...g, tipo: 'gasto' }))
+                        ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).map(m => {
+                            const familia = estado.familias.find(f => f.id === m.familiaId);
+                            let origen = familia ? familia.nombre : 'Eliminada';
+                            if (m.tipo === 'gasto' && m.desdeVaquita) origen = '💰 Vaquita';
+                            const fecha = new Date(m.fecha).toLocaleDateString('es-MX');
+                            const clase = m.tipo === 'aporte' ? 'positivo' : '';
+                            return `
+                                <tr>
+                                    <td>${fecha}</td>
+                                    <td>${origen}</td>
+                                    <td>${m.tipo === 'aporte' ? 'Aporte' : 'Gasto'}</td>
+                                    <td>${m.concepto}</td>
+                                    <td class="${clase}">${formatearMoneda(m.monto)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </table>
+
+                    <div class="footer">
+                        <p>Generado con Vaquita - Control de Gastos del Viaje Familiar</p>
+                    </div>
+
+                    <script>
+                        window.onload = function() {
+                            window.print();
+                        }
+                    </script>
+                </body>
+                </html>
+            `);
+            ventana.document.close();
+        }
+
+        // Importar datos
+        function importarDatos() {
+            document.getElementById('importFile').click();
+        }
+
+        function procesarImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const datos = JSON.parse(e.target.result);
+                    if (datos.familias && datos.aportes && datos.gastos) {
+                        if (confirm('Esto reemplazara todos los datos actuales. ¿Continuar?')) {
+                            estado = datos;
+                            guardarDatos();
+                            actualizarUI();
+                            alert('Datos importados correctamente');
+                        }
+                    } else {
+                        alert('Archivo no valido');
+                    }
+                } catch (err) {
+                    alert('Error al leer el archivo');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // Limpiar todo
+        function limpiarTodo() {
+            if (!confirm('¿Estas seguro de eliminar TODOS los datos? Esta accion no se puede deshacer.')) return;
+            if (!confirm('¿Realmente seguro? Se perdera todo.')) return;
+
+            estado = { familias: [], aportes: [], gastos: [] };
+            guardarDatos();
+            actualizarUI();
+        }
+
+        // Inicializar
+        cargarDatos();
+    </script>
+</body>
+</html>
