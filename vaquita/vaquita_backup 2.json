@@ -1,0 +1,52 @@
+{
+  "familias": [
+    {
+      "id": 1766373867504,
+      "nombre": "Tio Fer (+4)"
+    },
+    {
+      "id": 1766373883832,
+      "nombre": "Tio Efra (+3)"
+    },
+    {
+      "id": 1766373889669,
+      "nombre": "Clau (+4)"
+    },
+    {
+      "id": 1766373908253,
+      "nombre": "Edd (+3)"
+    }
+  ],
+  "aportes": [
+    {
+      "id": 1766373951248,
+      "familiaId": 1766373867504,
+      "monto": 10000,
+      "concepto": "Vaquita",
+      "fecha": "2025-12-22T03:25:51.248Z"
+    },
+    {
+      "id": 1766373958152,
+      "familiaId": 1766373908253,
+      "monto": 10000,
+      "concepto": "Vaquita",
+      "fecha": "2025-12-22T03:25:58.152Z"
+    }
+  ],
+  "gastos": [
+    {
+      "id": 1766377353146,
+      "familiaId": 1766373889669,
+      "desdeVaquita": false,
+      "monto": 3341.27,
+      "concepto": "Quesos, crema, arepas, pinturitas.",
+      "participantes": [
+        1766373867504,
+        1766373883832,
+        1766373889669,
+        1766373908253
+      ],
+      "fecha": "2025-12-22T04:22:33.146Z"
+    }
+  ]
+}

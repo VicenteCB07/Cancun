@@ -685,6 +685,7 @@
     <div class="container">
         <h1>Vaquita</h1>
         <p class="subtitle">Control de gastos del viaje familiar</p>
+        <p id="conexionIndicador" style="text-align: center; font-size: 0.9em; margin-bottom: 15px;">⏳ Conectando...</p>
 
         <!-- Resumen General -->
         <div class="card">
@@ -812,15 +813,32 @@
                 <button onclick="exportarCSV()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">📊 Exportar CSV</button>
                 <button onclick="exportarPDF()" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">📄 Exportar PDF</button>
             </div>
-            <p style="color: #666; margin: 15px 0;">Respaldo de datos:</p>
+            <p style="color: #28a745; margin: 15px 0;">☁️ Los datos se sincronizan automáticamente en la nube</p>
             <div class="actions">
-                <button id="btnAutoRespaldo" onclick="configurarAutoRespaldo()" style="background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);">🔄 Configurar Auto-respaldo</button>
                 <button onclick="limpiarTodo()" class="btn-danger">🗑️ Limpiar Todo</button>
             </div>
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
     <script>
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9zbtoeYQdAZKdes6oc34ICUE9t8j8Zkc",
+            authDomain: "vaquita-cancun.firebaseapp.com",
+            projectId: "vaquita-cancun",
+            storageBucket: "vaquita-cancun.firebasestorage.app",
+            messagingSenderId: "131351363226",
+            appId: "1:131351363226:web:80655a701463c25767e923"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         // Estado de la aplicacion
         let estado = {
             familias: [],
@@ -828,57 +846,63 @@
             gastos: []
         };
 
-        // Cargar datos guardados
+        // Indicador de conexión
+        let conectado = false;
+
+        // Cargar datos desde Firestore (tiempo real)
         function cargarDatos() {
-            const guardado = localStorage.getItem('vaquita_datos');
-            if (guardado) {
-                estado = JSON.parse(guardado);
-            }
-            actualizarUI();
-        }
-
-        // Guardar datos
-        function guardarDatos() {
-            localStorage.setItem('vaquita_datos', JSON.stringify(estado));
-            autoRespaldo(); // Guardar respaldo automático
-        }
-
-        // Auto-respaldo: guarda automáticamente usando File System Access API
-        let respaldoPendiente = null;
-        let archivoRespaldo = null; // Handle del archivo para sobrescribir
-
-        async function configurarAutoRespaldo() {
-            try {
-                archivoRespaldo = await window.showSaveFilePicker({
-                    suggestedName: 'vaquita_backup.json',
-                    types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
-                });
-                document.getElementById('btnAutoRespaldo').textContent = '✅ Auto-respaldo activo';
-                document.getElementById('btnAutoRespaldo').style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
-                await autoRespaldo(); // Guardar inmediatamente
-                alert('Auto-respaldo configurado. Los datos se guardarán automáticamente en ese archivo.');
-            } catch (err) {
-                console.log('Usuario canceló selección de archivo');
-            }
-        }
-
-        async function autoRespaldo() {
-            if (!archivoRespaldo) return; // No hay archivo configurado
-
-            clearTimeout(respaldoPendiente);
-            respaldoPendiente = setTimeout(async () => {
-                try {
-                    const writable = await archivoRespaldo.createWritable();
-                    await writable.write(JSON.stringify(estado, null, 2));
-                    await writable.close();
-                    console.log('✅ Auto-respaldo guardado');
-                } catch (err) {
-                    console.error('Error guardando respaldo:', err);
-                    archivoRespaldo = null; // Reset si hay error
-                    document.getElementById('btnAutoRespaldo').textContent = '🔄 Configurar Auto-respaldo';
-                    document.getElementById('btnAutoRespaldo').style.background = '';
+            // Escuchar cambios en tiempo real
+            db.collection('vaquita').doc('datos').onSnapshot((doc) => {
+                if (doc.exists) {
+                    estado = doc.data();
+                    conectado = true;
+                    actualizarIndicadorConexion();
+                } else {
+                    // Si no existe el documento, crearlo con datos vacíos
+                    estado = { familias: [], aportes: [], gastos: [] };
+                    guardarDatos();
                 }
-            }, 500);
+                actualizarUI();
+                console.log('✅ Datos sincronizados desde la nube');
+            }, (error) => {
+                console.error('Error cargando datos:', error);
+                conectado = false;
+                actualizarIndicadorConexion();
+                // Fallback a localStorage
+                const guardado = localStorage.getItem('vaquita_datos');
+                if (guardado) {
+                    estado = JSON.parse(guardado);
+                    actualizarUI();
+                }
+            });
+        }
+
+        // Guardar datos en Firestore
+        async function guardarDatos() {
+            try {
+                await db.collection('vaquita').doc('datos').set(estado);
+                // También guardar en localStorage como respaldo
+                localStorage.setItem('vaquita_datos', JSON.stringify(estado));
+                console.log('✅ Datos guardados en la nube');
+            } catch (error) {
+                console.error('Error guardando datos:', error);
+                // Si falla Firestore, guardar solo en localStorage
+                localStorage.setItem('vaquita_datos', JSON.stringify(estado));
+            }
+        }
+
+        // Actualizar indicador de conexión
+        function actualizarIndicadorConexion() {
+            const indicador = document.getElementById('conexionIndicador');
+            if (indicador) {
+                if (conectado) {
+                    indicador.innerHTML = '☁️ Sincronizado';
+                    indicador.style.color = '#28a745';
+                } else {
+                    indicador.innerHTML = '📴 Sin conexión';
+                    indicador.style.color = '#dc3545';
+                }
+            }
         }
 
         // Agregar familia
