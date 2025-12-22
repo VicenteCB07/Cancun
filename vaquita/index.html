@@ -492,6 +492,7 @@
             </div>
             <p style="color: #666; margin: 15px 0;">Respaldo de datos:</p>
             <div class="actions">
+                <button id="btnAutoRespaldo" onclick="configurarAutoRespaldo()" style="background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);">🔄 Configurar Auto-respaldo</button>
                 <button onclick="exportarDatos()" class="btn-secondary">💾 Guardar Respaldo (JSON)</button>
                 <button onclick="importarDatos()" class="btn-secondary">📂 Cargar Respaldo</button>
                 <button onclick="limpiarTodo()" class="btn-danger">🗑️ Limpiar Todo</button>
@@ -523,22 +524,42 @@
             autoRespaldo(); // Guardar respaldo automático
         }
 
-        // Auto-respaldo: descarga automáticamente un archivo JSON
+        // Auto-respaldo: guarda automáticamente usando File System Access API
         let respaldoPendiente = null;
-        function autoRespaldo() {
-            // Usar debounce para no descargar en cada cambio pequeño
+        let archivoRespaldo = null; // Handle del archivo para sobrescribir
+
+        async function configurarAutoRespaldo() {
+            try {
+                archivoRespaldo = await window.showSaveFilePicker({
+                    suggestedName: 'vaquita_backup.json',
+                    types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+                });
+                document.getElementById('btnAutoRespaldo').textContent = '✅ Auto-respaldo activo';
+                document.getElementById('btnAutoRespaldo').style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+                await autoRespaldo(); // Guardar inmediatamente
+                alert('Auto-respaldo configurado. Los datos se guardarán automáticamente en ese archivo.');
+            } catch (err) {
+                console.log('Usuario canceló selección de archivo');
+            }
+        }
+
+        async function autoRespaldo() {
+            if (!archivoRespaldo) return; // No hay archivo configurado
+
             clearTimeout(respaldoPendiente);
-            respaldoPendiente = setTimeout(() => {
-                const dataStr = JSON.stringify(estado, null, 2);
-                const blob = new Blob([dataStr], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'vaquita_backup.json';
-                a.click();
-                URL.revokeObjectURL(url);
-                console.log('✅ Auto-respaldo guardado: vaquita_backup.json');
-            }, 1000); // Esperar 1 segundo después del último cambio
+            respaldoPendiente = setTimeout(async () => {
+                try {
+                    const writable = await archivoRespaldo.createWritable();
+                    await writable.write(JSON.stringify(estado, null, 2));
+                    await writable.close();
+                    console.log('✅ Auto-respaldo guardado');
+                } catch (err) {
+                    console.error('Error guardando respaldo:', err);
+                    archivoRespaldo = null; // Reset si hay error
+                    document.getElementById('btnAutoRespaldo').textContent = '🔄 Configurar Auto-respaldo';
+                    document.getElementById('btnAutoRespaldo').style.background = '';
+                }
+            }, 500);
         }
 
         // Agregar familia
@@ -1098,11 +1119,11 @@
                         <p>Generado con Vaquita - Control de Gastos del Viaje Familiar</p>
                     </div>
 
-                    <script>
+                    <scr` + `ipt>
                         window.onload = function() {
                             window.print();
                         }
-                    </script>
+                    </scr` + `ipt>
                 </body>
                 </html>
             `);
