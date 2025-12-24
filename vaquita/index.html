@@ -748,6 +748,10 @@
                         <label>Monto</label>
                         <input type="number" id="montoAporte" placeholder="0.00" step="0.01">
                     </div>
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="fechaAporte">
+                    </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -770,6 +774,10 @@
                     <div class="form-group">
                         <label>Monto</label>
                         <input type="number" id="montoGasto" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="fechaGasto">
                     </div>
                 </div>
                 <div class="form-row">
@@ -954,6 +962,7 @@
             const familiaId = parseInt(document.getElementById('familiaAporte').value);
             const monto = parseFloat(document.getElementById('montoAporte').value);
             const concepto = document.getElementById('conceptoAporte').value.trim();
+            const fechaInput = document.getElementById('fechaAporte').value;
 
             if (!familiaId) {
                 alert('Selecciona una familia');
@@ -964,16 +973,20 @@
                 return;
             }
 
+            // Usar fecha seleccionada o fecha actual
+            const fecha = fechaInput ? new Date(fechaInput + 'T12:00:00').toISOString() : new Date().toISOString();
+
             estado.aportes.push({
                 id: Date.now(),
                 familiaId: familiaId,
                 monto: monto,
                 concepto: concepto || 'Aporte',
-                fecha: new Date().toISOString()
+                fecha: fecha
             });
 
             document.getElementById('montoAporte').value = '';
             document.getElementById('conceptoAporte').value = '';
+            document.getElementById('fechaAporte').value = new Date().toISOString().split('T')[0];
 
             guardarDatos();
             actualizarUI();
@@ -984,6 +997,7 @@
             const pagadoPor = document.getElementById('familiaGasto').value;
             const monto = parseFloat(document.getElementById('montoGasto').value);
             const concepto = document.getElementById('conceptoGasto').value.trim();
+            const fechaInput = document.getElementById('fechaGasto').value;
 
             // Obtener familias participantes
             const checkboxes = document.querySelectorAll('#familiasParticipantes input[type="checkbox"]:checked');
@@ -1019,6 +1033,9 @@
                 }
             }
 
+            // Usar fecha seleccionada o fecha actual
+            const fecha = fechaInput ? new Date(fechaInput + 'T12:00:00').toISOString() : new Date().toISOString();
+
             estado.gastos.push({
                 id: Date.now(),
                 familiaId: familiaId,
@@ -1026,11 +1043,12 @@
                 monto: monto,
                 concepto: concepto,
                 participantes: participantes,
-                fecha: new Date().toISOString()
+                fecha: fecha
             });
 
             document.getElementById('montoGasto').value = '';
             document.getElementById('conceptoGasto').value = '';
+            document.getElementById('fechaGasto').value = new Date().toISOString().split('T')[0];
 
             guardarDatos();
             actualizarUI();
@@ -1253,6 +1271,11 @@
                                     participantesInfo = `<br><small style="color: #666;">${numParticipantes} fam: ${nombresParticipantes}</small>`;
                                 }
 
+                                // Botón de editar solo para gastos
+                                const btnEditar = m.tipo === 'gasto'
+                                    ? `<button class="btn-secondary" onclick="editarParticipantes(${m.id})" style="margin-right: 5px;" title="Editar participantes">✏️</button>`
+                                    : '';
+
                                 return `
                                     <tr>
                                         <td>${fecha}</td>
@@ -1261,7 +1284,7 @@
                                         <td>${m.concepto}${participantesInfo}</td>
                                         <td class="${tipoClass}">${formatearMoneda(m.monto)}</td>
                                         <td>
-                                            <button class="btn-danger" onclick="eliminarMovimiento('${m.tipo}', ${m.id})">X</button>
+                                            ${btnEditar}<button class="btn-danger" onclick="eliminarMovimiento('${m.tipo}', ${m.id})">X</button>
                                         </td>
                                     </tr>
                                 `;
@@ -1515,8 +1538,77 @@
             actualizarUI();
         }
 
+        // Inicializar fechas por default (hoy)
+        function inicializarFechas() {
+            const hoy = new Date().toISOString().split('T')[0];
+            document.getElementById('fechaAporte').value = hoy;
+            document.getElementById('fechaGasto').value = hoy;
+        }
+
+        // Editar participantes de un gasto
+        function editarParticipantes(gastoId) {
+            const gasto = estado.gastos.find(g => g.id === gastoId);
+            if (!gasto) return;
+
+            // Crear modal
+            const modal = document.createElement('div');
+            modal.id = 'modalEditar';
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;';
+
+            const participantesActuales = gasto.participantes || [];
+
+            modal.innerHTML = `
+                <div style="background: white; padding: 25px; border-radius: 15px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                    <h3 style="color: #c41e3a; margin-bottom: 15px;">Editar Participantes</h3>
+                    <p style="color: #666; margin-bottom: 15px;"><strong>${gasto.concepto}</strong> - ${formatearMoneda(gasto.monto)}</p>
+                    <div id="editarFamilias" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
+                        ${estado.familias.map(f => `
+                            <label class="checkbox-familia ${participantesActuales.includes(f.id) ? 'selected' : ''}" style="cursor: pointer;">
+                                <input type="checkbox" value="${f.id}" ${participantesActuales.includes(f.id) ? 'checked' : ''}
+                                    onchange="this.parentElement.classList.toggle('selected', this.checked)">
+                                ${f.nombre}
+                            </label>
+                        `).join('')}
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="guardarParticipantes(${gastoId})" style="flex: 1;">Guardar</button>
+                        <button onclick="cerrarModal()" class="btn-secondary" style="flex: 1;">Cancelar</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+        }
+
+        // Guardar participantes editados
+        function guardarParticipantes(gastoId) {
+            const checkboxes = document.querySelectorAll('#editarFamilias input[type="checkbox"]:checked');
+            const nuevosParticipantes = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+            if (nuevosParticipantes.length === 0) {
+                alert('Selecciona al menos una familia');
+                return;
+            }
+
+            const gasto = estado.gastos.find(g => g.id === gastoId);
+            if (gasto) {
+                gasto.participantes = nuevosParticipantes;
+                guardarDatos();
+                actualizarUI();
+            }
+
+            cerrarModal();
+        }
+
+        // Cerrar modal
+        function cerrarModal() {
+            const modal = document.getElementById('modalEditar');
+            if (modal) modal.remove();
+        }
+
         // Inicializar
         cargarDatos();
+        inicializarFechas();
 
         // ==================== ANIMACIONES NAVIDEÑAS ÉPICAS ====================
 
