@@ -973,8 +973,8 @@
                 return;
             }
 
-            // Usar fecha seleccionada o fecha actual
-            const fecha = fechaInput ? new Date(fechaInput + 'T12:00:00').toISOString() : new Date().toISOString();
+            // Usar fecha seleccionada o fecha actual (hora de México)
+            const fecha = fechaInput ? fechaInput + 'T12:00:00' : obtenerFechaHoraMexico();
 
             estado.aportes.push({
                 id: Date.now(),
@@ -986,7 +986,7 @@
 
             document.getElementById('montoAporte').value = '';
             document.getElementById('conceptoAporte').value = '';
-            document.getElementById('fechaAporte').value = new Date().toISOString().split('T')[0];
+            document.getElementById('fechaAporte').value = obtenerFechaMexico();
 
             guardarDatos();
             actualizarUI();
@@ -1033,8 +1033,8 @@
                 }
             }
 
-            // Usar fecha seleccionada o fecha actual
-            const fecha = fechaInput ? new Date(fechaInput + 'T12:00:00').toISOString() : new Date().toISOString();
+            // Usar fecha seleccionada o fecha actual (hora de México)
+            const fecha = fechaInput ? fechaInput + 'T12:00:00' : obtenerFechaHoraMexico();
 
             estado.gastos.push({
                 id: Date.now(),
@@ -1048,7 +1048,7 @@
 
             document.getElementById('montoGasto').value = '';
             document.getElementById('conceptoGasto').value = '';
-            document.getElementById('fechaGasto').value = new Date().toISOString().split('T')[0];
+            document.getElementById('fechaGasto').value = obtenerFechaMexico();
 
             guardarDatos();
             actualizarUI();
@@ -1538,9 +1538,32 @@
             actualizarUI();
         }
 
-        // Inicializar fechas por default (hoy)
+        // Obtener fecha actual en zona horaria de México
+        function obtenerFechaMexico() {
+            return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+        }
+
+        // Obtener fecha/hora completa en zona horaria de México (para guardar)
+        function obtenerFechaHoraMexico() {
+            const opciones = {
+                timeZone: 'America/Mexico_City',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            };
+            const partes = new Intl.DateTimeFormat('en-CA', opciones).formatToParts(new Date());
+            const valores = {};
+            partes.forEach(p => valores[p.type] = p.value);
+            return `${valores.year}-${valores.month}-${valores.day}T${valores.hour}:${valores.minute}:${valores.second}`;
+        }
+
+        // Inicializar fechas por default (hoy en México)
         function inicializarFechas() {
-            const hoy = new Date().toISOString().split('T')[0];
+            const hoy = obtenerFechaMexico();
             document.getElementById('fechaAporte').value = hoy;
             document.getElementById('fechaGasto').value = hoy;
         }
