@@ -810,6 +810,25 @@
         <!-- Historial de Movimientos -->
         <div class="card">
             <h2>Historial de Movimientos</h2>
+            <div style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; align-items: center;">
+                <div>
+                    <label style="margin-right: 8px;">Ordenar por:</label>
+                    <select id="ordenMovimientos" onchange="actualizarUI()" style="padding: 8px; border-radius: 5px; border: 2px solid #e0e0e0;">
+                        <option value="fecha-desc">Fecha (reciente primero)</option>
+                        <option value="fecha-asc">Fecha (antiguo primero)</option>
+                        <option value="registro-desc">Registro (reciente primero)</option>
+                        <option value="registro-asc">Registro (antiguo primero)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="margin-right: 8px;">Filtrar:</label>
+                    <select id="filtroTipo" onchange="actualizarUI()" style="padding: 8px; border-radius: 5px; border: 2px solid #e0e0e0;">
+                        <option value="todos">Todos</option>
+                        <option value="aporte">Solo Aportes</option>
+                        <option value="gasto">Solo Gastos</option>
+                    </select>
+                </div>
+            </div>
             <div id="historialMovimientos"></div>
         </div>
 
@@ -1227,11 +1246,28 @@
                 }).join('');
             }
 
-            // Historial de movimientos
-            const movimientos = [
+            // Historial de movimientos con filtros y ordenamiento
+            const orden = document.getElementById('ordenMovimientos')?.value || 'fecha-desc';
+            const filtro = document.getElementById('filtroTipo')?.value || 'todos';
+
+            let movimientos = [
                 ...estado.aportes.map(a => ({ ...a, tipo: 'aporte' })),
                 ...estado.gastos.map(g => ({ ...g, tipo: 'gasto' }))
-            ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+            ];
+
+            // Aplicar filtro por tipo
+            if (filtro !== 'todos') {
+                movimientos = movimientos.filter(m => m.tipo === filtro);
+            }
+
+            // Aplicar ordenamiento
+            movimientos.sort((a, b) => {
+                if (orden === 'fecha-desc') return new Date(b.fecha) - new Date(a.fecha);
+                if (orden === 'fecha-asc') return new Date(a.fecha) - new Date(b.fecha);
+                if (orden === 'registro-desc') return b.id - a.id;
+                if (orden === 'registro-asc') return a.id - b.id;
+                return 0;
+            });
 
             if (movimientos.length === 0) {
                 document.getElementById('historialMovimientos').innerHTML =
