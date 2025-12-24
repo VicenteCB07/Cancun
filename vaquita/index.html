@@ -1604,7 +1604,7 @@
             document.getElementById('fechaGasto').value = hoy;
         }
 
-        // Editar participantes de un gasto
+        // Editar gasto (participantes y quién pagó)
         function editarParticipantes(gastoId) {
             const gasto = estado.gastos.find(g => g.id === gastoId);
             if (!gasto) return;
@@ -1615,22 +1615,38 @@
             modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;';
 
             const participantesActuales = gasto.participantes || [];
+            const pagadoPorActual = gasto.desdeVaquita ? 'vaquita' : gasto.familiaId;
 
             modal.innerHTML = `
-                <div style="background: white; padding: 25px; border-radius: 15px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto;">
-                    <h3 style="color: #c41e3a; margin-bottom: 15px;">Editar Participantes</h3>
+                <div style="background: white; padding: 25px; border-radius: 15px; max-width: 450px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                    <h3 style="color: #c41e3a; margin-bottom: 15px;">Editar Gasto</h3>
                     <p style="color: #666; margin-bottom: 15px;"><strong>${gasto.concepto}</strong> - ${formatearMoneda(gasto.monto)}</p>
-                    <div id="editarFamilias" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
-                        ${estado.familias.map(f => `
-                            <label class="checkbox-familia ${participantesActuales.includes(f.id) ? 'selected' : ''}" style="cursor: pointer;">
-                                <input type="checkbox" value="${f.id}" ${participantesActuales.includes(f.id) ? 'checked' : ''}
-                                    onchange="this.parentElement.classList.toggle('selected', this.checked)">
-                                ${f.nombre}
-                            </label>
-                        `).join('')}
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">¿Quién pagó?</label>
+                        <select id="editarPagadoPor" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px;">
+                            <option value="vaquita" ${pagadoPorActual === 'vaquita' ? 'selected' : ''}>💰 Desde la Vaquita</option>
+                            ${estado.familias.map(f => `
+                                <option value="${f.id}" ${pagadoPorActual === f.id ? 'selected' : ''}>${f.nombre}</option>
+                            `).join('')}
+                        </select>
                     </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Familias que participan:</label>
+                        <div id="editarFamilias" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                            ${estado.familias.map(f => `
+                                <label class="checkbox-familia ${participantesActuales.includes(f.id) ? 'selected' : ''}" style="cursor: pointer;">
+                                    <input type="checkbox" value="${f.id}" ${participantesActuales.includes(f.id) ? 'checked' : ''}
+                                        onchange="this.parentElement.classList.toggle('selected', this.checked)">
+                                    ${f.nombre}
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+
                     <div style="display: flex; gap: 10px;">
-                        <button onclick="guardarParticipantes(${gastoId})" style="flex: 1;">Guardar</button>
+                        <button onclick="guardarEdicionGasto(${gastoId})" style="flex: 1;">Guardar</button>
                         <button onclick="cerrarModal()" class="btn-secondary" style="flex: 1;">Cancelar</button>
                     </div>
                 </div>
@@ -1639,19 +1655,31 @@
             document.body.appendChild(modal);
         }
 
-        // Guardar participantes editados
-        function guardarParticipantes(gastoId) {
+        // Guardar edición del gasto
+        function guardarEdicionGasto(gastoId) {
             const checkboxes = document.querySelectorAll('#editarFamilias input[type="checkbox"]:checked');
             const nuevosParticipantes = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            const pagadoPor = document.getElementById('editarPagadoPor').value;
 
             if (nuevosParticipantes.length === 0) {
-                alert('Selecciona al menos una familia');
+                alert('Selecciona al menos una familia participante');
                 return;
             }
 
             const gasto = estado.gastos.find(g => g.id === gastoId);
             if (gasto) {
+                // Actualizar quién pagó
+                if (pagadoPor === 'vaquita') {
+                    gasto.desdeVaquita = true;
+                    gasto.familiaId = null;
+                } else {
+                    gasto.desdeVaquita = false;
+                    gasto.familiaId = parseInt(pagadoPor);
+                }
+
+                // Actualizar participantes
                 gasto.participantes = nuevosParticipantes;
+
                 guardarDatos();
                 actualizarUI();
             }
