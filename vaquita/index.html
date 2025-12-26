@@ -793,6 +793,19 @@
                         <button type="button" onclick="seleccionarTodas()" class="btn-secondary" style="margin-top: 10px;">Seleccionar Todas</button>
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dividir gasto:</label>
+                        <div style="display: flex; gap: 15px; margin-top: 10px;">
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="radio" name="tipoDivision" value="familia" checked> Por familia
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="radio" name="tipoDivision" value="integrante"> Por integrante
+                            </label>
+                        </div>
+                    </div>
+                </div>
                 <button onclick="registrarGasto()">Registrar Gasto</button>
             </div>
         </div>
@@ -964,6 +977,19 @@
             actualizarUI();
         }
 
+        // Editar nombre de familia
+        function editarFamilia(id) {
+            const familia = estado.familias.find(f => f.id === id);
+            if (!familia) return;
+
+            const nuevoNombre = prompt('Nuevo nombre de la familia:\n(Incluye +N para indicar integrantes, ej: "Tio Fer (+4)")', familia.nombre);
+            if (nuevoNombre && nuevoNombre.trim() !== '') {
+                familia.nombre = nuevoNombre.trim();
+                guardarDatos();
+                actualizarUI();
+            }
+        }
+
         // Cambiar tab
         function cambiarTab(tipo) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1014,6 +1040,7 @@
             const monto = parseFloat(document.getElementById('montoGasto').value);
             const concepto = document.getElementById('conceptoGasto').value.trim();
             const fechaInput = document.getElementById('fechaGasto').value;
+            const tipoDivision = document.querySelector('input[name="tipoDivision"]:checked').value;
 
             // Obtener familias participantes
             const checkboxes = document.querySelectorAll('#familiasParticipantes input[type="checkbox"]:checked');
@@ -1059,6 +1086,7 @@
                 monto: monto,
                 concepto: concepto,
                 participantes: participantes,
+                tipoDivision: tipoDivision, // 'familia' o 'integrante'
                 fecha: fecha
             });
 
@@ -1118,6 +1146,14 @@
             return { totalGastos, totalAportes, cuotaFamilia, numFamilias };
         }
 
+        // Extraer número de integrantes del nombre de familia (ej: "Tio Fer (+4)" -> 4)
+        function obtenerIntegrantes(familiaId) {
+            const familia = estado.familias.find(f => f.id === familiaId);
+            if (!familia) return 1;
+            const match = familia.nombre.match(/\+(\d+)/);
+            return match ? parseInt(match[1]) : 1;
+        }
+
         // Calcular balance por familia
         function calcularBalanceFamilia(familiaId) {
             const aportes = estado.aportes
@@ -1130,15 +1166,21 @@
                 .reduce((sum, g) => sum + g.monto, 0);
 
             // Calcular cuota: sumar la parte proporcional de TODOS los gastos donde participa
-            // Incluyendo los pagados desde vaquita - así es más justo:
-            // - Solo pagas tu parte de los gastos en los que participas
-            // - Si no participas, no te cobran
-            // - Los gastos de vaquita se distribuyen solo entre participantes
             let cuotaGastosFamilia = 0;
             estado.gastos.forEach(g => {
                 const participantes = g.participantes || estado.familias.map(f => f.id);
                 if (participantes.includes(familiaId)) {
-                    cuotaGastosFamilia += g.monto / participantes.length;
+                    const tipoDivision = g.tipoDivision || 'familia'; // default: por familia
+
+                    if (tipoDivision === 'integrante') {
+                        // División por integrante: calcular total de integrantes participantes
+                        const totalIntegrantes = participantes.reduce((sum, pId) => sum + obtenerIntegrantes(pId), 0);
+                        const integrantesFamilia = obtenerIntegrantes(familiaId);
+                        cuotaGastosFamilia += (g.monto / totalIntegrantes) * integrantesFamilia;
+                    } else {
+                        // División por familia: partes iguales
+                        cuotaGastosFamilia += g.monto / participantes.length;
+                    }
                 }
             });
 
@@ -1201,7 +1243,10 @@
                 document.getElementById('listaFamilias').innerHTML = estado.familias.map(f => `
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
                         <span style="font-weight: 500;">${f.nombre}</span>
-                        <button class="btn-danger" onclick="eliminarFamilia(${f.id})">Eliminar</button>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="btn-secondary" onclick="editarFamilia(${f.id})" title="Editar nombre">✏️</button>
+                            <button class="btn-danger" onclick="eliminarFamilia(${f.id})">Eliminar</button>
+                        </div>
                     </div>
                 `).join('');
             }
@@ -1294,14 +1339,15 @@
                                     pagadoPor = '💰 Vaquita';
                                 }
 
-                                // Para gastos, mostrar participantes
+                                // Para gastos, mostrar participantes y tipo de división
                                 let participantesInfo = '';
                                 if (m.tipo === 'gasto' && m.participantes) {
                                     const numParticipantes = m.participantes.length;
                                     const nombresParticipantes = m.participantes
                                         .map(id => estado.familias.find(f => f.id === id)?.nombre || '?')
                                         .join(', ');
-                                    participantesInfo = `<br><small style="color: #666;">${numParticipantes} fam: ${nombresParticipantes}</small>`;
+                                    const tipoDivTxt = m.tipoDivision === 'integrante' ? '👥 x persona' : '🏠 x familia';
+                                    participantesInfo = `<br><small style="color: #666;">${tipoDivTxt} | ${nombresParticipantes}</small>`;
                                 }
 
                                 // Botón de editar solo para gastos
@@ -1601,7 +1647,7 @@
             document.getElementById('fechaGasto').value = hoy;
         }
 
-        // Editar gasto (participantes y quién pagó)
+        // Editar gasto (participantes, quién pagó y tipo de división)
         function editarParticipantes(gastoId) {
             const gasto = estado.gastos.find(g => g.id === gastoId);
             if (!gasto) return;
@@ -1613,6 +1659,7 @@
 
             const participantesActuales = gasto.participantes || [];
             const pagadoPorActual = gasto.desdeVaquita ? 'vaquita' : gasto.familiaId;
+            const tipoDivisionActual = gasto.tipoDivision || 'familia';
 
             modal.innerHTML = `
                 <div style="background: white; padding: 25px; border-radius: 15px; max-width: 450px; width: 90%; max-height: 80vh; overflow-y: auto;">
@@ -1642,6 +1689,18 @@
                         </div>
                     </div>
 
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Dividir gasto:</label>
+                        <div style="display: flex; gap: 15px;">
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="radio" name="editarTipoDivision" value="familia" ${tipoDivisionActual === 'familia' ? 'checked' : ''}> 🏠 Por familia
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="radio" name="editarTipoDivision" value="integrante" ${tipoDivisionActual === 'integrante' ? 'checked' : ''}> 👥 Por integrante
+                            </label>
+                        </div>
+                    </div>
+
                     <div style="display: flex; gap: 10px;">
                         <button onclick="guardarEdicionGasto(${gastoId})" style="flex: 1;">Guardar</button>
                         <button onclick="cerrarModal()" class="btn-secondary" style="flex: 1;">Cancelar</button>
@@ -1657,6 +1716,7 @@
             const checkboxes = document.querySelectorAll('#editarFamilias input[type="checkbox"]:checked');
             const nuevosParticipantes = Array.from(checkboxes).map(cb => parseInt(cb.value));
             const pagadoPor = document.getElementById('editarPagadoPor').value;
+            const tipoDivision = document.querySelector('input[name="editarTipoDivision"]:checked').value;
 
             if (nuevosParticipantes.length === 0) {
                 alert('Selecciona al menos una familia participante');
@@ -1674,8 +1734,9 @@
                     gasto.familiaId = parseInt(pagadoPor);
                 }
 
-                // Actualizar participantes
+                // Actualizar participantes y tipo de división
                 gasto.participantes = nuevosParticipantes;
+                gasto.tipoDivision = tipoDivision;
 
                 guardarDatos();
                 actualizarUI();
