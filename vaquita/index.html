@@ -802,12 +802,18 @@
                         <label>Dividir gasto:</label>
                         <div style="display: flex; gap: 15px; margin-top: 10px;">
                             <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="radio" name="tipoDivision" value="familia" checked> Por familia
+                                <input type="radio" name="tipoDivision" value="familia" checked onchange="toggleIntegrantesGasto()"> Por familia
                             </label>
                             <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="radio" name="tipoDivision" value="integrante"> Por integrante
+                                <input type="radio" name="tipoDivision" value="integrante" onchange="toggleIntegrantesGasto()"> Por integrante
                             </label>
                         </div>
+                    </div>
+                </div>
+                <div class="form-row" id="integrantesGastoContainer" style="display: none;">
+                    <div class="form-group">
+                        <label>Integrantes por familia:</label>
+                        <div id="integrantesGastoList" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"></div>
                     </div>
                 </div>
                 <button onclick="registrarGasto()">Registrar Gasto</button>
@@ -1055,6 +1061,52 @@
             if (modal) modal.remove();
         }
 
+        // Mostrar/ocultar campos de integrantes al cambiar tipo de división
+        function toggleIntegrantesGasto() {
+            const tipoDivision = document.querySelector('input[name="tipoDivision"]:checked').value;
+            const container = document.getElementById('integrantesGastoContainer');
+
+            if (tipoDivision === 'integrante') {
+                container.style.display = 'block';
+                actualizarIntegrantesGasto();
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
+        // Actualizar lista de integrantes por familia (basado en familias seleccionadas)
+        function actualizarIntegrantesGasto() {
+            const checkboxes = document.querySelectorAll('#familiasParticipantes input[type="checkbox"]:checked');
+            const familiasSeleccionadas = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            const container = document.getElementById('integrantesGastoList');
+
+            if (familiasSeleccionadas.length === 0) {
+                container.innerHTML = '<span style="color: #666;">Selecciona familias participantes primero</span>';
+                return;
+            }
+
+            container.innerHTML = familiasSeleccionadas.map(familiaId => {
+                const familia = estado.familias.find(f => f.id === familiaId);
+                if (!familia) return '';
+
+                const maxIntegrantes = obtenerIntegrantes(familiaId);
+                const nombreCorto = familia.nombre.replace(/\s*\(\+\d+\)$/, '');
+
+                return `
+                    <div style="display: flex; align-items: center; gap: 8px; background: #f0f8ff; padding: 8px 12px; border-radius: 8px; border: 1px solid #4a90d9;">
+                        <span style="font-weight: 500;">${nombreCorto}:</span>
+                        <input type="number"
+                            id="integrantes_${familiaId}"
+                            value="${maxIntegrantes}"
+                            min="1"
+                            max="${maxIntegrantes}"
+                            style="width: 50px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px;">
+                        <span style="color: #666; font-size: 0.9em;">/ ${maxIntegrantes}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
         // Cambiar tab
         function cambiarTab(tipo) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1144,6 +1196,18 @@
             // Usar fecha seleccionada o fecha actual (hora de México)
             const fecha = fechaInput ? fechaInput + 'T12:00:00' : obtenerFechaHoraMexico();
 
+            // Obtener integrantes personalizados por familia (solo si es división por integrante)
+            let integrantesPorFamilia = null;
+            if (tipoDivision === 'integrante') {
+                integrantesPorFamilia = {};
+                participantes.forEach(familiaId => {
+                    const input = document.getElementById(`integrantes_${familiaId}`);
+                    const maxInt = obtenerIntegrantes(familiaId);
+                    const valor = input ? parseInt(input.value) || maxInt : maxInt;
+                    integrantesPorFamilia[familiaId] = Math.min(valor, maxInt);
+                });
+            }
+
             estado.gastos.push({
                 id: Date.now(),
                 familiaId: familiaId,
@@ -1152,12 +1216,16 @@
                 concepto: concepto,
                 participantes: participantes,
                 tipoDivision: tipoDivision, // 'familia' o 'integrante'
+                integrantesPorFamilia: integrantesPorFamilia, // { familiaId: numIntegrantes }
                 fecha: fecha
             });
 
             document.getElementById('montoGasto').value = '';
             document.getElementById('conceptoGasto').value = '';
             document.getElementById('fechaGasto').value = obtenerFechaMexico();
+            // Ocultar y resetear el contenedor de integrantes
+            document.getElementById('integrantesGastoContainer').style.display = 'none';
+            document.querySelector('input[name="tipoDivision"][value="familia"]').checked = true;
 
             guardarDatos();
             actualizarUI();
@@ -1180,11 +1248,21 @@
                 cb.checked = !allChecked;
                 cb.parentElement.classList.toggle('selected', !allChecked);
             });
+            // Actualizar integrantes si está visible
+            const tipoDivision = document.querySelector('input[name="tipoDivision"]:checked')?.value;
+            if (tipoDivision === 'integrante') {
+                actualizarIntegrantesGasto();
+            }
         }
 
         // Toggle checkbox familia
         function toggleFamiliaParticipante(checkbox) {
             checkbox.parentElement.classList.toggle('selected', checkbox.checked);
+            // Actualizar integrantes si está visible
+            const tipoDivision = document.querySelector('input[name="tipoDivision"]:checked')?.value;
+            if (tipoDivision === 'integrante') {
+                actualizarIntegrantesGasto();
+            }
         }
 
         // Eliminar movimiento
@@ -1238,9 +1316,17 @@
                     const tipoDivision = g.tipoDivision || 'familia'; // default: por familia
 
                     if (tipoDivision === 'integrante') {
-                        // División por integrante: calcular total de integrantes participantes
-                        const totalIntegrantes = participantes.reduce((sum, pId) => sum + obtenerIntegrantes(pId), 0);
-                        const integrantesFamilia = obtenerIntegrantes(familiaId);
+                        // División por integrante: usar integrantes personalizados si existen
+                        const integrantesPorFamilia = g.integrantesPorFamilia || {};
+
+                        // Calcular total de integrantes participantes
+                        const totalIntegrantes = participantes.reduce((sum, pId) => {
+                            return sum + (integrantesPorFamilia[pId] || obtenerIntegrantes(pId));
+                        }, 0);
+
+                        // Obtener integrantes de esta familia para este gasto
+                        const integrantesFamilia = integrantesPorFamilia[familiaId] || obtenerIntegrantes(familiaId);
+
                         cuotaGastosFamilia += (g.monto / totalIntegrantes) * integrantesFamilia;
                     } else {
                         // División por familia: partes iguales
@@ -1725,6 +1811,7 @@
             const participantesActuales = gasto.participantes || [];
             const pagadoPorActual = gasto.desdeVaquita ? 'vaquita' : gasto.familiaId;
             const tipoDivisionActual = gasto.tipoDivision || 'familia';
+            const integrantesPorFamiliaActual = gasto.integrantesPorFamilia || {};
 
             modal.innerHTML = `
                 <div style="background: white; padding: 25px; border-radius: 15px; max-width: 450px; width: 90%; max-height: 80vh; overflow-y: auto;">
@@ -1747,7 +1834,7 @@
                             ${estado.familias.map(f => `
                                 <label class="checkbox-familia ${participantesActuales.includes(f.id) ? 'selected' : ''}" style="cursor: pointer;">
                                     <input type="checkbox" value="${f.id}" ${participantesActuales.includes(f.id) ? 'checked' : ''}
-                                        onchange="this.parentElement.classList.toggle('selected', this.checked)">
+                                        onchange="this.parentElement.classList.toggle('selected', this.checked); toggleEditarIntegrantes();">
                                     ${f.nombre}
                                 </label>
                             `).join('')}
@@ -1758,12 +1845,17 @@
                         <label style="display: block; margin-bottom: 8px; font-weight: 500;">Dividir gasto:</label>
                         <div style="display: flex; gap: 15px;">
                             <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="radio" name="editarTipoDivision" value="familia" ${tipoDivisionActual === 'familia' ? 'checked' : ''}> 🏠 Por familia
+                                <input type="radio" name="editarTipoDivision" value="familia" ${tipoDivisionActual === 'familia' ? 'checked' : ''} onchange="toggleEditarIntegrantes()"> 🏠 Por familia
                             </label>
                             <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="radio" name="editarTipoDivision" value="integrante" ${tipoDivisionActual === 'integrante' ? 'checked' : ''}> 👥 Por integrante
+                                <input type="radio" name="editarTipoDivision" value="integrante" ${tipoDivisionActual === 'integrante' ? 'checked' : ''} onchange="toggleEditarIntegrantes()"> 👥 Por integrante
                             </label>
                         </div>
+                    </div>
+
+                    <div id="editarIntegrantesContainer" style="margin-bottom: 20px; display: ${tipoDivisionActual === 'integrante' ? 'block' : 'none'};">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Integrantes por familia:</label>
+                        <div id="editarIntegrantesList" style="display: flex; flex-wrap: wrap; gap: 10px;"></div>
                     </div>
 
                     <div style="display: flex; gap: 10px;">
@@ -1774,6 +1866,59 @@
             `;
 
             document.body.appendChild(modal);
+
+            // Guardar integrantes actuales para el modal
+            window.integrantesEditarActuales = integrantesPorFamiliaActual;
+
+            // Inicializar lista de integrantes si es por integrante
+            if (tipoDivisionActual === 'integrante') {
+                toggleEditarIntegrantes();
+            }
+        }
+
+        // Toggle integrantes en modal de edición
+        function toggleEditarIntegrantes() {
+            const tipoDivision = document.querySelector('input[name="editarTipoDivision"]:checked')?.value;
+            const container = document.getElementById('editarIntegrantesContainer');
+            const lista = document.getElementById('editarIntegrantesList');
+
+            if (!container || !lista) return;
+
+            if (tipoDivision === 'integrante') {
+                container.style.display = 'block';
+
+                const checkboxes = document.querySelectorAll('#editarFamilias input[type="checkbox"]:checked');
+                const familiasSeleccionadas = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+                if (familiasSeleccionadas.length === 0) {
+                    lista.innerHTML = '<span style="color: #666;">Selecciona familias participantes primero</span>';
+                    return;
+                }
+
+                lista.innerHTML = familiasSeleccionadas.map(familiaId => {
+                    const familia = estado.familias.find(f => f.id === familiaId);
+                    if (!familia) return '';
+
+                    const maxIntegrantes = obtenerIntegrantes(familiaId);
+                    const nombreCorto = familia.nombre.replace(/\s*\(\+\d+\)$/, '');
+                    const valorActual = window.integrantesEditarActuales?.[familiaId] || maxIntegrantes;
+
+                    return `
+                        <div style="display: flex; align-items: center; gap: 8px; background: #f0f8ff; padding: 8px 12px; border-radius: 8px; border: 1px solid #4a90d9;">
+                            <span style="font-weight: 500;">${nombreCorto}:</span>
+                            <input type="number"
+                                id="editarIntegrantes_${familiaId}"
+                                value="${valorActual}"
+                                min="1"
+                                max="${maxIntegrantes}"
+                                style="width: 50px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px;">
+                            <span style="color: #666; font-size: 0.9em;">/ ${maxIntegrantes}</span>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                container.style.display = 'none';
+            }
         }
 
         // Guardar edición del gasto
@@ -1803,10 +1948,26 @@
                 gasto.participantes = nuevosParticipantes;
                 gasto.tipoDivision = tipoDivision;
 
+                // Actualizar integrantes personalizados si es división por integrante
+                if (tipoDivision === 'integrante') {
+                    const integrantesPorFamilia = {};
+                    nuevosParticipantes.forEach(familiaId => {
+                        const input = document.getElementById(`editarIntegrantes_${familiaId}`);
+                        const maxInt = obtenerIntegrantes(familiaId);
+                        const valor = input ? parseInt(input.value) || maxInt : maxInt;
+                        integrantesPorFamilia[familiaId] = Math.min(valor, maxInt);
+                    });
+                    gasto.integrantesPorFamilia = integrantesPorFamilia;
+                } else {
+                    gasto.integrantesPorFamilia = null;
+                }
+
                 guardarDatos();
                 actualizarUI();
             }
 
+            // Limpiar variable temporal
+            window.integrantesEditarActuales = null;
             cerrarModal();
         }
 
