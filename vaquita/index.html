@@ -721,10 +721,14 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Nombre de la Familia</label>
-                    <input type="text" id="nombreFamilia" placeholder="Ej: Familia Garcia">
+                    <input type="text" id="nombreFamilia" placeholder="Ej: Tio Fer, Familia Garcia">
+                </div>
+                <div class="form-group" style="flex: 0; min-width: 100px;">
+                    <label>Integrantes</label>
+                    <input type="number" id="integrantesFamilia" placeholder="4" min="1" value="1" style="text-align: center;">
                 </div>
                 <div class="form-group" style="flex: 0; display: flex; align-items: flex-end;">
-                    <button onclick="agregarFamilia()">Agregar Familia</button>
+                    <button onclick="agregarFamilia()">Agregar</button>
                 </div>
             </div>
             <div id="listaFamilias"></div>
@@ -945,21 +949,27 @@
         // Agregar familia
         function agregarFamilia() {
             const nombre = document.getElementById('nombreFamilia').value.trim();
+            const integrantes = parseInt(document.getElementById('integrantesFamilia').value) || 1;
+
             if (!nombre) {
                 alert('Por favor ingresa el nombre de la familia');
                 return;
             }
-            if (estado.familias.find(f => f.nombre.toLowerCase() === nombre.toLowerCase())) {
+            if (estado.familias.find(f => f.nombre.toLowerCase().startsWith(nombre.toLowerCase()))) {
                 alert('Esta familia ya existe');
                 return;
             }
 
+            // Guardar nombre con integrantes: "Nombre (+N)"
+            const nombreCompleto = `${nombre} (+${integrantes})`;
+
             estado.familias.push({
                 id: Date.now(),
-                nombre: nombre
+                nombre: nombreCompleto
             });
 
             document.getElementById('nombreFamilia').value = '';
+            document.getElementById('integrantesFamilia').value = '1';
             guardarDatos();
             actualizarUI();
         }
