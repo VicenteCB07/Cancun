@@ -734,11 +734,6 @@
                     <div>Familias</div>
                     <div class="summary-value" id="numFamilias">0</div>
                 </div>
-                <div class="summary-item">
-                    <div>Cuota por Familia</div>
-                    <div class="summary-value" id="cuotaFamilia">$0.00</div>
-                    <div style="font-size: 0.7em; margin-top: 5px; opacity: 0.9;" id="formulaCuota"></div>
-                </div>
                 <div class="summary-item green">
                     <div>Total Recaudado</div>
                     <div class="summary-value" id="totalAportes">$0.00</div>
@@ -1703,16 +1698,12 @@
 
         // Actualizar UI
         function actualizarUI() {
-            const { totalGastos, totalAportes, cuotaFamilia, numFamilias } = calcularTotales();
+            const { totalGastos, totalAportes, numFamilias } = calcularTotales();
 
             // Actualizar resumen
             document.getElementById('totalGastos').textContent = formatearMoneda(totalGastos);
             document.getElementById('totalAportes').textContent = formatearMoneda(totalAportes);
-            document.getElementById('cuotaFamilia').textContent = formatearMoneda(cuotaFamilia);
             document.getElementById('numFamilias').textContent = numFamilias;
-            document.getElementById('formulaCuota').textContent = numFamilias > 0
-                ? `${formatearMoneda(totalGastos)} / ${numFamilias} familias`
-                : '';
 
             // Saldo de la vaquita
             const saldoVaquita = calcularSaldoVaquita();
