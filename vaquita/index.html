@@ -853,10 +853,10 @@
                     <label>Dividir aporte:</label>
                     <div style="display: flex; gap: 15px; margin-top: 10px;">
                         <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="radio" name="calcTipoDivision" value="familia" checked onchange="calcularAportesSugeridos()"> Por familia
+                            <input type="radio" name="calcTipoDivision" value="familia" checked onchange="toggleCalcIntegrantes()"> Por familia
                         </label>
                         <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="radio" name="calcTipoDivision" value="integrante" onchange="calcularAportesSugeridos()"> Por integrante
+                            <input type="radio" name="calcTipoDivision" value="integrante" onchange="toggleCalcIntegrantes()"> Por integrante
                         </label>
                     </div>
                 </div>
@@ -867,6 +867,13 @@
                     <label>Familias que participan:</label>
                     <div id="calcFamiliasParticipantes" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"></div>
                     <button type="button" onclick="seleccionarTodasCalc()" class="btn-secondary" style="margin-top: 10px;">Seleccionar Todas</button>
+                </div>
+            </div>
+
+            <div class="form-row" id="calcIntegrantesContainer" style="display: none;">
+                <div class="form-group">
+                    <label>Integrantes por familia:</label>
+                    <div id="calcIntegrantesList" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"></div>
                 </div>
             </div>
 
@@ -1308,7 +1315,60 @@
                 cb.checked = !allChecked;
                 cb.parentElement.classList.toggle('selected', !allChecked);
             });
+            // Actualizar integrantes si está visible
+            const tipoDivision = document.querySelector('input[name="calcTipoDivision"]:checked')?.value;
+            if (tipoDivision === 'integrante') {
+                actualizarCalcIntegrantes();
+            }
             calcularAportesSugeridos();
+        }
+
+        // Toggle integrantes en calculadora
+        function toggleCalcIntegrantes() {
+            const tipoDivision = document.querySelector('input[name="calcTipoDivision"]:checked')?.value;
+            const container = document.getElementById('calcIntegrantesContainer');
+
+            if (tipoDivision === 'integrante') {
+                container.style.display = 'block';
+                actualizarCalcIntegrantes();
+            } else {
+                container.style.display = 'none';
+            }
+            calcularAportesSugeridos();
+        }
+
+        // Actualizar lista de integrantes en calculadora
+        function actualizarCalcIntegrantes() {
+            const checkboxes = document.querySelectorAll('#calcFamiliasParticipantes input[type="checkbox"]:checked');
+            const familiasSeleccionadas = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            const container = document.getElementById('calcIntegrantesList');
+
+            if (familiasSeleccionadas.length === 0) {
+                container.innerHTML = '<span style="color: #666;">Selecciona familias participantes primero</span>';
+                return;
+            }
+
+            container.innerHTML = familiasSeleccionadas.map(familiaId => {
+                const familia = estado.familias.find(f => f.id === familiaId);
+                if (!familia) return '';
+
+                const maxIntegrantes = obtenerIntegrantes(familiaId);
+                const nombreCorto = familia.nombre.replace(/\s*\(\+\d+\)$/, '');
+
+                return `
+                    <div style="display: flex; align-items: center; gap: 8px; background: #f0f8ff; padding: 8px 12px; border-radius: 8px; border: 1px solid #4a90d9;">
+                        <span style="font-weight: 500;">${nombreCorto}:</span>
+                        <input type="number"
+                            id="calcIntegrantes_${familiaId}"
+                            value="${maxIntegrantes}"
+                            min="1"
+                            max="${maxIntegrantes}"
+                            oninput="calcularAportesSugeridos()"
+                            style="width: 50px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px;">
+                        <span style="color: #666; font-size: 0.9em;">/ ${maxIntegrantes}</span>
+                    </div>
+                `;
+            }).join('');
         }
 
         // Calcular aportes sugeridos
@@ -1338,12 +1398,21 @@
             let totalIntegrantes = 0;
 
             if (tipoDivision === 'integrante') {
-                totalIntegrantes = familiasParticipantes.reduce((sum, fId) => sum + obtenerIntegrantes(fId), 0);
+                // Obtener integrantes personalizados de los inputs
+                const integrantesPorFamilia = {};
+                familiasParticipantes.forEach(familiaId => {
+                    const input = document.getElementById(`calcIntegrantes_${familiaId}`);
+                    const maxInt = obtenerIntegrantes(familiaId);
+                    integrantesPorFamilia[familiaId] = input ? Math.min(parseInt(input.value) || maxInt, maxInt) : maxInt;
+                });
+
+                totalIntegrantes = familiasParticipantes.reduce((sum, fId) => sum + integrantesPorFamilia[fId], 0);
                 const costoPorIntegrante = montoARecaudar / totalIntegrantes;
 
                 familiasParticipantes.forEach(familiaId => {
                     const familia = estado.familias.find(f => f.id === familiaId);
-                    const integrantes = obtenerIntegrantes(familiaId);
+                    const integrantes = integrantesPorFamilia[familiaId];
+                    const maxIntegrantes = obtenerIntegrantes(familiaId);
                     const cuotaBase = costoPorIntegrante * integrantes;
                     const balanceActual = calcularBalanceFamilia(familiaId).balance;
                     // Si balance es positivo (aportó de más), se resta del aporte
@@ -1353,6 +1422,7 @@
                     aportesPorFamilia.push({
                         nombre: nombreCorto,
                         integrantes: integrantes,
+                        maxIntegrantes: maxIntegrantes,
                         cuotaBase: cuotaBase,
                         balanceActual: balanceActual,
                         aporteReal: aporteReal
@@ -1409,12 +1479,13 @@
                     ${aportesPorFamilia.map(f => {
                         const balanceColor = f.balanceActual >= 0 ? '#2e7d32' : '#c62828';
                         const balanceTexto = f.balanceActual >= 0 ? 'a favor' : 'pendiente';
+                        const integrantesTexto = f.integrantes ? (f.integrantes === f.maxIntegrantes ? `(${f.integrantes} int.)` : `(${f.integrantes}/${f.maxIntegrantes} int.)`) : '';
                         return `
                         <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #4caf50;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                 <span>
                                     <strong>${f.nombre}</strong>
-                                    ${f.integrantes ? `<span style="color: #666; font-size: 0.9em;">(${f.integrantes} int.)</span>` : ''}
+                                    ${integrantesTexto ? `<span style="color: #666; font-size: 0.9em;">${integrantesTexto}</span>` : ''}
                                 </span>
                                 <strong style="color: #1565c0; font-size: 1.3em;">${formatearMoneda(f.aporteReal)}</strong>
                             </div>
@@ -1568,7 +1639,7 @@
             // Checkboxes de familias para calculadora
             document.getElementById('calcFamiliasParticipantes').innerHTML = estado.familias.map(f => `
                 <label class="checkbox-familia selected">
-                    <input type="checkbox" value="${f.id}" checked onchange="this.parentElement.classList.toggle('selected', this.checked); calcularAportesSugeridos();">
+                    <input type="checkbox" value="${f.id}" checked onchange="this.parentElement.classList.toggle('selected', this.checked); const tipDiv = document.querySelector('input[name=calcTipoDivision]:checked')?.value; if(tipDiv === 'integrante') actualizarCalcIntegrantes(); calcularAportesSugeridos();">
                     ${f.nombre}
                 </label>
             `).join('');
