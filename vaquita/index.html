@@ -1333,7 +1333,7 @@
             const totalNecesario = gastoPlaneado + saldoDeseado;
             const montoARecaudar = Math.max(0, totalNecesario - saldoActual);
 
-            // Calcular aporte por familia
+            // Calcular aporte por familia considerando balance actual
             let aportesPorFamilia = [];
             let totalIntegrantes = 0;
 
@@ -1344,23 +1344,33 @@
                 familiasParticipantes.forEach(familiaId => {
                     const familia = estado.familias.find(f => f.id === familiaId);
                     const integrantes = obtenerIntegrantes(familiaId);
-                    const aporte = costoPorIntegrante * integrantes;
+                    const cuotaBase = costoPorIntegrante * integrantes;
+                    const balanceActual = calcularBalanceFamilia(familiaId).balance;
+                    // Si balance es positivo (aportó de más), se resta del aporte
+                    // Si balance es negativo (debe), se suma al aporte
+                    const aporteReal = Math.max(0, cuotaBase - balanceActual);
                     const nombreCorto = familia.nombre.replace(/\s*\(\+\d+\)$/, '');
                     aportesPorFamilia.push({
                         nombre: nombreCorto,
                         integrantes: integrantes,
-                        aporte: aporte
+                        cuotaBase: cuotaBase,
+                        balanceActual: balanceActual,
+                        aporteReal: aporteReal
                     });
                 });
             } else {
-                const aportePorFamilia = montoARecaudar / familiasParticipantes.length;
+                const cuotaBasePorFamilia = montoARecaudar / familiasParticipantes.length;
 
                 familiasParticipantes.forEach(familiaId => {
                     const familia = estado.familias.find(f => f.id === familiaId);
+                    const balanceActual = calcularBalanceFamilia(familiaId).balance;
+                    const aporteReal = Math.max(0, cuotaBasePorFamilia - balanceActual);
                     const nombreCorto = familia.nombre.replace(/\s*\(\+\d+\)$/, '');
                     aportesPorFamilia.push({
                         nombre: nombreCorto,
-                        aporte: aportePorFamilia
+                        cuotaBase: cuotaBasePorFamilia,
+                        balanceActual: balanceActual,
+                        aporteReal: aporteReal
                     });
                 });
             }
@@ -1396,15 +1406,24 @@
                 <h3 style="color: #2e7d32; margin-bottom: 15px;">💵 Aporte sugerido por familia ${tipoDivision === 'integrante' ? `(${totalIntegrantes} integrantes total)` : ''}</h3>
 
                 <div style="display: grid; gap: 10px;">
-                    ${aportesPorFamilia.map(f => `
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #4caf50;">
-                            <span>
-                                <strong>${f.nombre}</strong>
-                                ${f.integrantes ? `<span style="color: #666; font-size: 0.9em;">(${f.integrantes} integrantes)</span>` : ''}
-                            </span>
-                            <strong style="color: #1565c0; font-size: 1.2em;">${formatearMoneda(f.aporte)}</strong>
+                    ${aportesPorFamilia.map(f => {
+                        const balanceColor = f.balanceActual >= 0 ? '#2e7d32' : '#c62828';
+                        const balanceTexto = f.balanceActual >= 0 ? 'a favor' : 'pendiente';
+                        return `
+                        <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #4caf50;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span>
+                                    <strong>${f.nombre}</strong>
+                                    ${f.integrantes ? `<span style="color: #666; font-size: 0.9em;">(${f.integrantes} int.)</span>` : ''}
+                                </span>
+                                <strong style="color: #1565c0; font-size: 1.3em;">${formatearMoneda(f.aporteReal)}</strong>
+                            </div>
+                            <div style="font-size: 0.85em; color: #666; display: flex; justify-content: space-between;">
+                                <span>Cuota: ${formatearMoneda(f.cuotaBase)}</span>
+                                <span style="color: ${balanceColor};">Balance: ${formatearMoneda(Math.abs(f.balanceActual))} ${balanceTexto}</span>
+                            </div>
                         </div>
-                    `).join('')}
+                    `}).join('')}
                 </div>
 
                 ${saldoActual >= totalNecesario ? `
