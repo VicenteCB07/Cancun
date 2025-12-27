@@ -1556,14 +1556,13 @@
         function obtenerIntegrantes(familiaId) {
             // Contar integrantes desde la lista
             if (estado.integrantes && estado.integrantes.length > 0) {
-                const count = estado.integrantes.filter(i => i.familiaId === familiaId).length;
-                return count > 0 ? count : 1; // Mínimo 1
+                return estado.integrantes.filter(i => i.familiaId === familiaId).length;
             }
             // Fallback para datos antiguos: leer del nombre (+N)
             const familia = estado.familias.find(f => f.id === familiaId);
-            if (!familia) return 1;
+            if (!familia) return 0;
             const match = familia.nombre.match(/\+(\d+)/);
-            return match ? parseInt(match[1]) : 1;
+            return match ? parseInt(match[1]) : 0;
         }
 
         // Obtener lista de nombres de integrantes de una familia
