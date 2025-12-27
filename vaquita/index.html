@@ -1491,7 +1491,9 @@
             const totalNecesario = gastoPlaneado + saldoDeseado;
             const montoARecaudar = Math.max(0, totalNecesario - saldoActual);
 
-            // Calcular aporte por familia (cuota directa, sin ajustar por balance)
+            // Calcular aporte por familia considerando balance actual
+            // La cuota justa se calcula sobre el TOTAL NECESARIO
+            // Luego se resta el balance actual de cada familia
             let aportesPorFamilia = [];
             let totalIntegrantes = 0;
 
@@ -1505,30 +1507,53 @@
                 });
 
                 totalIntegrantes = familiasParticipantes.reduce((sum, fId) => sum + integrantesPorFamilia[fId], 0);
-                const costoPorIntegrante = montoARecaudar / totalIntegrantes;
+
+                // Cuota justa por integrante sobre el TOTAL NECESARIO
+                const cuotaPorIntegrante = totalNecesario / totalIntegrantes;
 
                 familiasParticipantes.forEach(familiaId => {
                     const familia = estado.familias.find(f => f.id === familiaId);
                     const integrantes = integrantesPorFamilia[familiaId];
                     const maxIntegrantes = obtenerIntegrantes(familiaId);
-                    const aporte = costoPorIntegrante * integrantes;
+
+                    // Cuota justa de esta familia
+                    const cuotaJusta = cuotaPorIntegrante * integrantes;
+
+                    // Obtener balance actual de la familia
+                    const balanceFamilia = calcularBalanceFamilia(familiaId);
+
+                    // Aporte = Cuota justa - Balance actual (lo que ya tiene a favor)
+                    const aporte = Math.max(0, cuotaJusta - balanceFamilia.balance);
+
                     const nombreCorto = familia.nombre.replace(/\s*\(\+\d+\)$/, '');
                     aportesPorFamilia.push({
                         nombre: nombreCorto,
                         integrantes: integrantes,
                         maxIntegrantes: maxIntegrantes,
+                        cuotaJusta: cuotaJusta,
+                        balance: balanceFamilia.balance,
                         aporte: aporte
                     });
                 });
             } else {
-                const aportePorFamilia = montoARecaudar / familiasParticipantes.length;
+                // Cuota justa por familia sobre el TOTAL NECESARIO
+                const cuotaPorFamilia = totalNecesario / familiasParticipantes.length;
 
                 familiasParticipantes.forEach(familiaId => {
                     const familia = estado.familias.find(f => f.id === familiaId);
+
+                    // Obtener balance actual de la familia
+                    const balanceFamilia = calcularBalanceFamilia(familiaId);
+
+                    // Aporte = Cuota justa - Balance actual
+                    const aporte = Math.max(0, cuotaPorFamilia - balanceFamilia.balance);
+
                     const nombreCorto = familia.nombre.replace(/\s*\(\+\d+\)$/, '');
                     aportesPorFamilia.push({
                         nombre: nombreCorto,
-                        aporte: aportePorFamilia
+                        cuotaJusta: cuotaPorFamilia,
+                        balance: balanceFamilia.balance,
+                        aporte: aporte
                     });
                 });
             }
@@ -1566,13 +1591,21 @@
                 <div style="display: grid; gap: 10px;">
                     ${aportesPorFamilia.map(f => {
                         const integrantesTexto = f.integrantes ? (f.integrantes === f.maxIntegrantes ? `(${f.integrantes} int.)` : `(${f.integrantes}/${f.maxIntegrantes} int.)`) : '';
+                        const balanceTexto = f.balance >= 0 ? `+${formatearMoneda(f.balance)}` : formatearMoneda(f.balance);
+                        const balanceColor = f.balance >= 0 ? '#2e7d32' : '#c62828';
                         return `
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #4caf50;">
-                            <span>
-                                <strong>${f.nombre}</strong>
-                                ${integrantesTexto ? `<span style="color: #666; font-size: 0.9em;">${integrantesTexto}</span>` : ''}
-                            </span>
-                            <strong style="color: #1565c0; font-size: 1.3em;">${formatearMoneda(f.aporte)}</strong>
+                        <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #4caf50;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span>
+                                    <strong>${f.nombre}</strong>
+                                    ${integrantesTexto ? `<span style="color: #666; font-size: 0.9em;">${integrantesTexto}</span>` : ''}
+                                </span>
+                                <strong style="color: #1565c0; font-size: 1.3em;">${formatearMoneda(f.aporte)}</strong>
+                            </div>
+                            <div style="font-size: 0.8em; color: #666; display: flex; gap: 15px;">
+                                <span>Cuota justa: ${formatearMoneda(f.cuotaJusta)}</span>
+                                <span>Balance: <span style="color: ${balanceColor};">${balanceTexto}</span></span>
+                            </div>
                         </div>
                     `}).join('')}
                 </div>
@@ -1583,7 +1616,7 @@
                         <strong style="color: #1565c0;">${formatearMoneda(aportesPorFamilia.reduce((sum, f) => sum + f.aporte, 0))}</strong>
                     </div>
                     <div style="font-size: 0.9em; color: #666; margin-top: 8px;">
-                        Saldo actual (${formatearMoneda(saldoActual)}) + Aportes (${formatearMoneda(montoARecaudar)}) - Gasto (${formatearMoneda(gastoPlaneado)}) = <strong style="color: #2e7d32;">${formatearMoneda(saldoDeseado)} saldo final</strong>
+                        Saldo actual (${formatearMoneda(saldoActual)}) + Aportes (${formatearMoneda(aportesPorFamilia.reduce((sum, f) => sum + f.aporte, 0))}) - Gasto (${formatearMoneda(gastoPlaneado)}) = <strong style="color: #2e7d32;">${formatearMoneda(saldoDeseado)} saldo final</strong>
                     </div>
                 </div>
 
