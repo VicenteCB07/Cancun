@@ -830,6 +830,51 @@
             <div id="balanceFamilias"></div>
         </div>
 
+        <!-- Calculadora de Aportes -->
+        <div class="card">
+            <h2>🧮 Calculadora de Aportes</h2>
+            <p style="color: #666; margin-bottom: 15px;">
+                Calcula cuánto debe aportar cada familia para cubrir un gasto y mantener un saldo deseado.
+            </p>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Gasto planeado ($)</label>
+                    <input type="number" id="calcGastoPlaneado" placeholder="Ej: 50000" min="0" oninput="calcularAportesSugeridos()">
+                </div>
+                <div class="form-group">
+                    <label>Saldo deseado después ($)</label>
+                    <input type="number" id="calcSaldoDeseado" placeholder="Ej: 10000" min="0" value="0" oninput="calcularAportesSugeridos()">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Dividir aporte:</label>
+                    <div style="display: flex; gap: 15px; margin-top: 10px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="radio" name="calcTipoDivision" value="familia" checked onchange="calcularAportesSugeridos()"> Por familia
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="radio" name="calcTipoDivision" value="integrante" onchange="calcularAportesSugeridos()"> Por integrante
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Familias que participan:</label>
+                    <div id="calcFamiliasParticipantes" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"></div>
+                    <button type="button" onclick="seleccionarTodasCalc()" class="btn-secondary" style="margin-top: 10px;">Seleccionar Todas</button>
+                </div>
+            </div>
+
+            <!-- Resultado de la calculadora -->
+            <div id="resultadoCalculadora" style="display: none; margin-top: 20px; padding: 20px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 12px; border: 2px solid #4caf50;">
+            </div>
+        </div>
+
         <!-- Historial de Movimientos -->
         <div class="card">
             <h2>Historial de Movimientos</h2>
@@ -1255,6 +1300,121 @@
             }
         }
 
+        // Seleccionar todas las familias en calculadora
+        function seleccionarTodasCalc() {
+            const checkboxes = document.querySelectorAll('#calcFamiliasParticipantes input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => {
+                cb.checked = !allChecked;
+                cb.parentElement.classList.toggle('selected', !allChecked);
+            });
+            calcularAportesSugeridos();
+        }
+
+        // Calcular aportes sugeridos
+        function calcularAportesSugeridos() {
+            const gastoPlaneado = parseFloat(document.getElementById('calcGastoPlaneado').value) || 0;
+            const saldoDeseado = parseFloat(document.getElementById('calcSaldoDeseado').value) || 0;
+            const tipoDivision = document.querySelector('input[name="calcTipoDivision"]:checked')?.value || 'familia';
+
+            const checkboxes = document.querySelectorAll('#calcFamiliasParticipantes input[type="checkbox"]:checked');
+            const familiasParticipantes = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+            const resultado = document.getElementById('resultadoCalculadora');
+
+            // Validar que hay datos
+            if (gastoPlaneado <= 0 || familiasParticipantes.length === 0) {
+                resultado.style.display = 'none';
+                return;
+            }
+
+            // Calcular
+            const saldoActual = calcularSaldoVaquita();
+            const totalNecesario = gastoPlaneado + saldoDeseado;
+            const montoARecaudar = Math.max(0, totalNecesario - saldoActual);
+
+            // Calcular aporte por familia
+            let aportesPorFamilia = [];
+            let totalIntegrantes = 0;
+
+            if (tipoDivision === 'integrante') {
+                totalIntegrantes = familiasParticipantes.reduce((sum, fId) => sum + obtenerIntegrantes(fId), 0);
+                const costoPorIntegrante = montoARecaudar / totalIntegrantes;
+
+                familiasParticipantes.forEach(familiaId => {
+                    const familia = estado.familias.find(f => f.id === familiaId);
+                    const integrantes = obtenerIntegrantes(familiaId);
+                    const aporte = costoPorIntegrante * integrantes;
+                    const nombreCorto = familia.nombre.replace(/\s*\(\+\d+\)$/, '');
+                    aportesPorFamilia.push({
+                        nombre: nombreCorto,
+                        integrantes: integrantes,
+                        aporte: aporte
+                    });
+                });
+            } else {
+                const aportePorFamilia = montoARecaudar / familiasParticipantes.length;
+
+                familiasParticipantes.forEach(familiaId => {
+                    const familia = estado.familias.find(f => f.id === familiaId);
+                    const nombreCorto = familia.nombre.replace(/\s*\(\+\d+\)$/, '');
+                    aportesPorFamilia.push({
+                        nombre: nombreCorto,
+                        aporte: aportePorFamilia
+                    });
+                });
+            }
+
+            // Mostrar resultado
+            resultado.style.display = 'block';
+            resultado.innerHTML = `
+                <h3 style="color: #2e7d32; margin-bottom: 15px;">📊 Resumen</h3>
+
+                <div style="display: grid; gap: 10px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; padding: 8px; background: white; border-radius: 8px;">
+                        <span>Gasto planeado:</span>
+                        <strong>${formatearMoneda(gastoPlaneado)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px; background: white; border-radius: 8px;">
+                        <span>Saldo deseado después:</span>
+                        <strong>${formatearMoneda(saldoDeseado)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px; background: white; border-radius: 8px;">
+                        <span>Total necesario:</span>
+                        <strong>${formatearMoneda(totalNecesario)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px; background: #fff3e0; border-radius: 8px;">
+                        <span>Saldo actual en vaquita:</span>
+                        <strong style="color: ${saldoActual >= 0 ? '#2e7d32' : '#c62828'};">${formatearMoneda(saldoActual)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 10px; background: #ffeb3b; border-radius: 8px; font-size: 1.1em;">
+                        <span><strong>💰 Monto a recaudar:</strong></span>
+                        <strong style="color: #c62828;">${formatearMoneda(montoARecaudar)}</strong>
+                    </div>
+                </div>
+
+                <h3 style="color: #2e7d32; margin-bottom: 15px;">💵 Aporte sugerido por familia ${tipoDivision === 'integrante' ? `(${totalIntegrantes} integrantes total)` : ''}</h3>
+
+                <div style="display: grid; gap: 10px;">
+                    ${aportesPorFamilia.map(f => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #4caf50;">
+                            <span>
+                                <strong>${f.nombre}</strong>
+                                ${f.integrantes ? `<span style="color: #666; font-size: 0.9em;">(${f.integrantes} integrantes)</span>` : ''}
+                            </span>
+                            <strong style="color: #1565c0; font-size: 1.2em;">${formatearMoneda(f.aporte)}</strong>
+                        </div>
+                    `).join('')}
+                </div>
+
+                ${saldoActual >= totalNecesario ? `
+                    <div style="margin-top: 15px; padding: 12px; background: #c8e6c9; border-radius: 8px; text-align: center;">
+                        <strong style="color: #2e7d32;">✅ ¡Ya tienes suficiente saldo! No es necesario recaudar más.</strong>
+                    </div>
+                ` : ''}
+            `;
+        }
+
         // Toggle checkbox familia
         function toggleFamiliaParticipante(checkbox) {
             checkbox.parentElement.classList.toggle('selected', checkbox.checked);
@@ -1378,10 +1538,18 @@
                 `<option value="vaquita">💰 Desde la Vaquita (${formatearMoneda(saldoVaquita)} disponible)</option>` +
                 optionsFamilias;
 
-            // Checkboxes de familias participantes
+            // Checkboxes de familias participantes (gastos)
             document.getElementById('familiasParticipantes').innerHTML = estado.familias.map(f => `
                 <label class="checkbox-familia selected">
                     <input type="checkbox" value="${f.id}" checked onchange="toggleFamiliaParticipante(this)">
+                    ${f.nombre}
+                </label>
+            `).join('');
+
+            // Checkboxes de familias para calculadora
+            document.getElementById('calcFamiliasParticipantes').innerHTML = estado.familias.map(f => `
+                <label class="checkbox-familia selected">
+                    <input type="checkbox" value="${f.id}" checked onchange="this.parentElement.classList.toggle('selected', this.checked); calcularAportesSugeridos();">
                     ${f.nombre}
                 </label>
             `).join('');
