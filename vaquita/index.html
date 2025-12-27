@@ -723,15 +723,31 @@
                     <label>Nombre de la Familia</label>
                     <input type="text" id="nombreFamilia" placeholder="Ej: Tio Fer, Familia Garcia">
                 </div>
-                <div class="form-group" style="flex: 0; min-width: 100px;">
-                    <label>Integrantes</label>
-                    <input type="number" id="integrantesFamilia" placeholder="4" min="1" value="1" style="text-align: center;">
-                </div>
                 <div class="form-group" style="flex: 0; display: flex; align-items: flex-end;">
                     <button onclick="agregarFamilia()">Agregar</button>
                 </div>
             </div>
             <div id="listaFamilias"></div>
+        </div>
+
+        <!-- Gestionar Integrantes -->
+        <div class="card">
+            <h2>👥 Integrantes</h2>
+            <p style="color: #666; margin-bottom: 15px;">Registra a cada persona y asígnale su familia. El conteo de integrantes por familia se actualiza automáticamente.</p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Nombre del Integrante</label>
+                    <input type="text" id="nombreIntegrante" placeholder="Ej: Juan, María, Pedro">
+                </div>
+                <div class="form-group">
+                    <label>Familia</label>
+                    <select id="familiaIntegrante"></select>
+                </div>
+                <div class="form-group" style="flex: 0; display: flex; align-items: flex-end;">
+                    <button onclick="agregarIntegrante()">Agregar</button>
+                </div>
+            </div>
+            <div id="listaIntegrantes"></div>
         </div>
 
         <!-- Registro de Movimientos -->
@@ -941,6 +957,7 @@
         // Estado de la aplicacion
         let estado = {
             familias: [],
+            integrantes: [], // { id, nombre, familiaId }
             aportes: [],
             gastos: []
         };
@@ -1007,107 +1024,111 @@
         // Agregar familia
         function agregarFamilia() {
             const nombre = document.getElementById('nombreFamilia').value.trim();
-            const integrantes = parseInt(document.getElementById('integrantesFamilia').value) || 1;
 
             if (!nombre) {
                 alert('Por favor ingresa el nombre de la familia');
                 return;
             }
-            if (estado.familias.find(f => f.nombre.toLowerCase().startsWith(nombre.toLowerCase()))) {
+            if (estado.familias.find(f => f.nombre.toLowerCase() === nombre.toLowerCase())) {
                 alert('Esta familia ya existe');
                 return;
             }
 
-            // Guardar nombre con integrantes: "Nombre (+N)"
-            const nombreCompleto = `${nombre} (+${integrantes})`;
-
             estado.familias.push({
                 id: Date.now(),
-                nombre: nombreCompleto
+                nombre: nombre
             });
 
             document.getElementById('nombreFamilia').value = '';
-            document.getElementById('integrantesFamilia').value = '1';
             guardarDatos();
             actualizarUI();
+        }
+
+        // Agregar integrante
+        function agregarIntegrante() {
+            const nombre = document.getElementById('nombreIntegrante').value.trim();
+            const familiaId = parseInt(document.getElementById('familiaIntegrante').value);
+
+            if (!nombre) {
+                alert('Por favor ingresa el nombre del integrante');
+                return;
+            }
+            if (!familiaId) {
+                alert('Por favor selecciona una familia');
+                return;
+            }
+
+            // Inicializar array si no existe (para datos antiguos)
+            if (!estado.integrantes) {
+                estado.integrantes = [];
+            }
+
+            estado.integrantes.push({
+                id: Date.now(),
+                nombre: nombre,
+                familiaId: familiaId
+            });
+
+            document.getElementById('nombreIntegrante').value = '';
+            guardarDatos();
+            actualizarUI();
+        }
+
+        // Eliminar integrante
+        function eliminarIntegrante(id) {
+            const integrante = estado.integrantes.find(i => i.id === id);
+            if (!confirm(`¿Eliminar a ${integrante.nombre}?`)) return;
+
+            estado.integrantes = estado.integrantes.filter(i => i.id !== id);
+            guardarDatos();
+            actualizarUI();
+        }
+
+        // Cambiar familia de integrante
+        function cambiarFamiliaIntegrante(integranteId, nuevaFamiliaId) {
+            const integrante = estado.integrantes.find(i => i.id === integranteId);
+            if (integrante) {
+                integrante.familiaId = parseInt(nuevaFamiliaId);
+                guardarDatos();
+                actualizarUI();
+            }
         }
 
         // Eliminar familia
         function eliminarFamilia(id) {
             const familia = estado.familias.find(f => f.id === id);
-            if (!confirm(`¿Eliminar a ${familia.nombre}? Se eliminaran sus aportes y gastos.`)) return;
+            const numIntegrantes = obtenerIntegrantes(id);
+            if (!confirm(`¿Eliminar a ${familia.nombre}? Se eliminarán sus ${numIntegrantes} integrantes, aportes y gastos.`)) return;
 
             estado.familias = estado.familias.filter(f => f.id !== id);
             estado.aportes = estado.aportes.filter(a => a.familiaId !== id);
             estado.gastos = estado.gastos.filter(g => g.familiaId !== id);
+            // Eliminar integrantes de esta familia
+            if (estado.integrantes) {
+                estado.integrantes = estado.integrantes.filter(i => i.familiaId !== id);
+            }
 
             guardarDatos();
             actualizarUI();
         }
 
-        // Editar familia (nombre e integrantes)
+        // Editar nombre de familia
         function editarFamilia(id) {
             const familia = estado.familias.find(f => f.id === id);
             if (!familia) return;
 
-            // Extraer nombre e integrantes del formato actual
-            const match = familia.nombre.match(/^(.+?)\s*\(\+(\d+)\)$/);
-            const nombreActual = match ? match[1].trim() : familia.nombre;
-            const integrantesActual = match ? parseInt(match[2]) : 1;
+            // Extraer nombre sin el (+N) si existe
+            const nombreActual = familia.nombre.replace(/\s*\(\+\d+\)$/, '').trim();
 
-            // Crear modal
-            const modal = document.createElement('div');
-            modal.id = 'modalEditarFamilia';
-            modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;';
-
-            modal.innerHTML = `
-                <div style="background: white; padding: 25px; border-radius: 15px; max-width: 400px; width: 90%;">
-                    <h3 style="color: #c41e3a; margin-bottom: 20px;">Editar Familia</h3>
-
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Nombre de la Familia</label>
-                        <input type="text" id="editarNombreFamilia" value="${nombreActual}"
-                            style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; box-sizing: border-box;">
-                    </div>
-
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Número de Integrantes</label>
-                        <input type="number" id="editarIntegrantesFamilia" value="${integrantesActual}" min="1"
-                            style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; text-align: center; box-sizing: border-box;">
-                    </div>
-
-                    <div style="display: flex; gap: 10px;">
-                        <button onclick="guardarEdicionFamilia(${id})" style="flex: 1;">Guardar</button>
-                        <button onclick="cerrarModalFamilia()" class="btn-secondary" style="flex: 1;">Cancelar</button>
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(modal);
-            document.getElementById('editarNombreFamilia').focus();
-        }
-
-        // Guardar edición de familia
-        function guardarEdicionFamilia(id) {
-            const nombre = document.getElementById('editarNombreFamilia').value.trim();
-            const integrantes = parseInt(document.getElementById('editarIntegrantesFamilia').value) || 1;
-
-            if (!nombre) {
-                alert('Por favor ingresa el nombre de la familia');
-                return;
-            }
-
-            const familia = estado.familias.find(f => f.id === id);
-            if (familia) {
-                familia.nombre = `${nombre} (+${integrantes})`;
+            const nuevoNombre = prompt('Nuevo nombre de la familia:', nombreActual);
+            if (nuevoNombre && nuevoNombre.trim() !== '') {
+                familia.nombre = nuevoNombre.trim();
                 guardarDatos();
                 actualizarUI();
             }
-
-            cerrarModalFamilia();
         }
 
-        // Cerrar modal de familia
+        // Cerrar modal de familia (legacy, por si se usa)
         function cerrarModalFamilia() {
             const modal = document.getElementById('modalEditarFamilia');
             if (modal) modal.remove();
@@ -1533,10 +1554,24 @@
 
         // Extraer número de integrantes del nombre de familia (ej: "Tio Fer (+4)" -> 4)
         function obtenerIntegrantes(familiaId) {
+            // Contar integrantes desde la lista
+            if (estado.integrantes && estado.integrantes.length > 0) {
+                const count = estado.integrantes.filter(i => i.familiaId === familiaId).length;
+                return count > 0 ? count : 1; // Mínimo 1
+            }
+            // Fallback para datos antiguos: leer del nombre (+N)
             const familia = estado.familias.find(f => f.id === familiaId);
             if (!familia) return 1;
             const match = familia.nombre.match(/\+(\d+)/);
             return match ? parseInt(match[1]) : 1;
+        }
+
+        // Obtener lista de nombres de integrantes de una familia
+        function obtenerNombresIntegrantes(familiaId) {
+            if (!estado.integrantes) return [];
+            return estado.integrantes
+                .filter(i => i.familiaId === familiaId)
+                .map(i => i.nombre);
         }
 
         // Calcular balance por familia
@@ -1606,9 +1641,15 @@
                 ? `Gastado: ${formatearMoneda(gastadoVaquita)}`
                 : 'Disponible para gastos';
 
+            // Función helper para mostrar nombre de familia con conteo
+            const getNombreFamiliaConConteo = (f) => {
+                const numInt = obtenerIntegrantes(f.id);
+                return `${f.nombre} (+${numInt})`;
+            };
+
             // Actualizar selectores de familias
             const optionsFamilias = estado.familias.map(f =>
-                `<option value="${f.id}">${f.nombre}</option>`
+                `<option value="${f.id}">${getNombreFamiliaConConteo(f)}</option>`
             ).join('');
 
             document.getElementById('familiaAporte').innerHTML =
@@ -1620,11 +1661,17 @@
                 `<option value="vaquita">💰 Desde la Vaquita (${formatearMoneda(saldoVaquita)} disponible)</option>` +
                 optionsFamilias;
 
+            // Selector de familia para integrantes
+            document.getElementById('familiaIntegrante').innerHTML =
+                '<option value="">Seleccionar...</option>' + estado.familias.map(f =>
+                    `<option value="${f.id}">${f.nombre}</option>`
+                ).join('');
+
             // Checkboxes de familias participantes (gastos)
             document.getElementById('familiasParticipantes').innerHTML = estado.familias.map(f => `
                 <label class="checkbox-familia selected">
                     <input type="checkbox" value="${f.id}" checked onchange="toggleFamiliaParticipante(this)">
-                    ${f.nombre}
+                    ${getNombreFamiliaConConteo(f)}
                 </label>
             `).join('');
 
@@ -1632,7 +1679,7 @@
             document.getElementById('calcFamiliasParticipantes').innerHTML = estado.familias.map(f => `
                 <label class="checkbox-familia selected">
                     <input type="checkbox" value="${f.id}" checked onchange="this.parentElement.classList.toggle('selected', this.checked); const tipDiv = document.querySelector('input[name=calcTipoDivision]:checked')?.value; if(tipDiv === 'integrante') actualizarCalcIntegrantes(); calcularAportesSugeridos();">
-                    ${f.nombre}
+                    ${getNombreFamiliaConConteo(f)}
                 </label>
             `).join('');
 
@@ -1641,15 +1688,47 @@
                 document.getElementById('listaFamilias').innerHTML =
                     '<div class="empty-state">No hay familias registradas</div>';
             } else {
-                document.getElementById('listaFamilias').innerHTML = estado.familias.map(f => `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
-                        <span style="font-weight: 500;">${f.nombre}</span>
-                        <div style="display: flex; gap: 5px;">
-                            <button class="btn-secondary" onclick="editarFamilia(${f.id})" title="Editar nombre">✏️</button>
-                            <button class="btn-danger" onclick="eliminarFamilia(${f.id})">Eliminar</button>
+                document.getElementById('listaFamilias').innerHTML = estado.familias.map(f => {
+                    const numInt = obtenerIntegrantes(f.id);
+                    const nombresInt = obtenerNombresIntegrantes(f.id);
+                    const nombresTexto = nombresInt.length > 0 ? nombresInt.join(', ') : 'Sin integrantes';
+                    return `
+                    <div style="padding: 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 500;">${f.nombre} <span style="color: #1565c0;">(+${numInt})</span></span>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn-secondary" onclick="editarFamilia(${f.id})" title="Editar nombre">✏️</button>
+                                <button class="btn-danger" onclick="eliminarFamilia(${f.id})">Eliminar</button>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.85em; color: #666; margin-top: 5px;">
+                            👥 ${nombresTexto}
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
+            }
+
+            // Lista de integrantes
+            if (!estado.integrantes || estado.integrantes.length === 0) {
+                document.getElementById('listaIntegrantes').innerHTML =
+                    '<div class="empty-state">No hay integrantes registrados. Agrega integrantes y asígnalos a una familia.</div>';
+            } else {
+                document.getElementById('listaIntegrantes').innerHTML = estado.integrantes.map(i => {
+                    const familia = estado.familias.find(f => f.id === i.familiaId);
+                    const familiaNombre = familia ? familia.nombre : 'Sin familia';
+                    return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px;">
+                        <span style="font-weight: 500;">${i.nombre}</span>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <select onchange="cambiarFamiliaIntegrante(${i.id}, this.value)" style="padding: 5px 10px; border-radius: 5px; border: 1px solid #ccc;">
+                                ${estado.familias.map(f => `
+                                    <option value="${f.id}" ${f.id === i.familiaId ? 'selected' : ''}>${f.nombre}</option>
+                                `).join('')}
+                            </select>
+                            <button class="btn-danger" onclick="eliminarIntegrante(${i.id})" style="padding: 5px 10px;">✕</button>
+                        </div>
+                    </div>
+                `}).join('');
             }
 
             // Balance por familia
@@ -1661,11 +1740,12 @@
                     const balance = calcularBalanceFamilia(f.id);
                     const balanceClass = balance.balance >= 0 ? 'amount-positive' : 'amount-negative';
                     const balanceTexto = balance.balance >= 0 ? 'Le debes' : 'Te debe';
+                    const numInt = obtenerIntegrantes(f.id);
 
                     return `
                         <div class="family-card">
                             <div class="family-header">
-                                <span class="family-name">${f.nombre}</span>
+                                <span class="family-name">${f.nombre} <span style="color: #1565c0; font-size: 0.85em;">(+${numInt})</span></span>
                                 <span class="family-balance ${balanceClass}">
                                     ${balanceTexto}: ${formatearMoneda(Math.abs(balance.balance))}
                                 </span>
