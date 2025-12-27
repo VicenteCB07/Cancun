@@ -1936,10 +1936,10 @@
                                     participantesInfo = `<br><small style="color: #666;">${tipoDivTxt} | ${nombresParticipantes}</small>`;
                                 }
 
-                                // Botón de editar solo para gastos
+                                // Botón de editar para gastos y aportes
                                 const btnEditar = m.tipo === 'gasto'
-                                    ? `<button class="btn-secondary" onclick="editarParticipantes(${m.id})" style="margin-right: 5px;" title="Editar participantes">✏️</button>`
-                                    : '';
+                                    ? `<button class="btn-secondary" onclick="editarGasto(${m.id})" style="margin-right: 5px;" title="Editar gasto">✏️</button>`
+                                    : `<button class="btn-secondary" onclick="editarAporte(${m.id})" style="margin-right: 5px;" title="Editar aporte">✏️</button>`;
 
                                 return `
                                     <tr>
@@ -2233,8 +2233,8 @@
             document.getElementById('fechaGasto').value = hoy;
         }
 
-        // Editar gasto (participantes, quién pagó y tipo de división)
-        function editarParticipantes(gastoId) {
+        // Editar gasto completo
+        function editarGasto(gastoId) {
             const gasto = estado.gastos.find(g => g.id === gastoId);
             if (!gasto) return;
 
@@ -2251,7 +2251,18 @@
             modal.innerHTML = `
                 <div style="background: white; padding: 25px; border-radius: 15px; max-width: 450px; width: 90%; max-height: 80vh; overflow-y: auto;">
                     <h3 style="color: #c41e3a; margin-bottom: 15px;">Editar Gasto</h3>
-                    <p style="color: #666; margin-bottom: 15px;"><strong>${gasto.concepto}</strong> - ${formatearMoneda(gasto.monto)}</p>
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Concepto:</label>
+                        <input type="text" id="editarConceptoGasto" value="${gasto.concepto}"
+                            style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; box-sizing: border-box;">
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Monto:</label>
+                        <input type="number" id="editarMontoGasto" value="${gasto.monto}" step="0.01" min="0"
+                            style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; box-sizing: border-box;">
+                    </div>
 
                     <div style="margin-bottom: 20px;">
                         <label style="display: block; margin-bottom: 8px; font-weight: 500;">¿Quién pagó?</label>
@@ -2358,11 +2369,21 @@
 
         // Guardar edición del gasto
         function guardarEdicionGasto(gastoId) {
+            const concepto = document.getElementById('editarConceptoGasto').value.trim();
+            const monto = parseFloat(document.getElementById('editarMontoGasto').value) || 0;
             const checkboxes = document.querySelectorAll('#editarFamilias input[type="checkbox"]:checked');
             const nuevosParticipantes = Array.from(checkboxes).map(cb => parseInt(cb.value));
             const pagadoPor = document.getElementById('editarPagadoPor').value;
             const tipoDivision = document.querySelector('input[name="editarTipoDivision"]:checked').value;
 
+            if (!concepto) {
+                alert('Ingresa un concepto');
+                return;
+            }
+            if (monto <= 0) {
+                alert('Ingresa un monto válido');
+                return;
+            }
             if (nuevosParticipantes.length === 0) {
                 alert('Selecciona al menos una familia participante');
                 return;
@@ -2370,6 +2391,10 @@
 
             const gasto = estado.gastos.find(g => g.id === gastoId);
             if (gasto) {
+                // Actualizar concepto y monto
+                gasto.concepto = concepto;
+                gasto.monto = monto;
+
                 // Actualizar quién pagó
                 if (pagadoPor === 'vaquita') {
                     gasto.desdeVaquita = true;
@@ -2403,6 +2428,79 @@
 
             // Limpiar variable temporal
             window.integrantesEditarActuales = null;
+            cerrarModal();
+        }
+
+        // Editar aporte
+        function editarAporte(aporteId) {
+            const aporte = estado.aportes.find(a => a.id === aporteId);
+            if (!aporte) return;
+
+            // Crear modal
+            const modal = document.createElement('div');
+            modal.id = 'modalEditar';
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;';
+
+            modal.innerHTML = `
+                <div style="background: white; padding: 25px; border-radius: 15px; max-width: 400px; width: 90%;">
+                    <h3 style="color: #2e7d32; margin-bottom: 20px;">Editar Aporte</h3>
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Familia:</label>
+                        <select id="editarFamiliaAporte" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px;">
+                            ${estado.familias.map(f => `
+                                <option value="${f.id}" ${aporte.familiaId === f.id ? 'selected' : ''}>${f.nombre}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Concepto:</label>
+                        <input type="text" id="editarConceptoAporte" value="${aporte.concepto}"
+                            style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; box-sizing: border-box;">
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Monto:</label>
+                        <input type="number" id="editarMontoAporte" value="${aporte.monto}" step="0.01" min="0"
+                            style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; box-sizing: border-box;">
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="guardarEdicionAporte(${aporteId})" style="flex: 1;">Guardar</button>
+                        <button onclick="cerrarModal()" class="btn-secondary" style="flex: 1;">Cancelar</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+        }
+
+        // Guardar edición del aporte
+        function guardarEdicionAporte(aporteId) {
+            const familiaId = parseInt(document.getElementById('editarFamiliaAporte').value);
+            const concepto = document.getElementById('editarConceptoAporte').value.trim();
+            const monto = parseFloat(document.getElementById('editarMontoAporte').value) || 0;
+
+            if (!concepto) {
+                alert('Ingresa un concepto');
+                return;
+            }
+            if (monto <= 0) {
+                alert('Ingresa un monto válido');
+                return;
+            }
+
+            const aporte = estado.aportes.find(a => a.id === aporteId);
+            if (aporte) {
+                aporte.familiaId = familiaId;
+                aporte.concepto = concepto;
+                aporte.monto = monto;
+
+                guardarDatos();
+                actualizarUI();
+            }
+
             cerrarModal();
         }
 
