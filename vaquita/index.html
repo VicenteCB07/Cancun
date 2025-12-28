@@ -927,11 +927,17 @@
                         </select>
                     </div>
                     <div>
-                        <label style="margin-right: 8px;">Filtrar:</label>
+                        <label style="margin-right: 8px;">Tipo:</label>
                         <select id="filtroTipo" onchange="actualizarUI()" style="padding: 8px; border-radius: 5px; border: 2px solid #e0e0e0;">
                             <option value="todos">Todos</option>
                             <option value="aporte">Solo Aportes</option>
                             <option value="gasto">Solo Gastos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="margin-right: 8px;">Familia:</label>
+                        <select id="filtroFamilia" onchange="actualizarUI()" style="padding: 8px; border-radius: 5px; border: 2px solid #e0e0e0;">
+                            <option value="todos">Todas</option>
                         </select>
                     </div>
                 </div>
@@ -1877,6 +1883,18 @@
             // Historial de movimientos con filtros y ordenamiento
             const orden = document.getElementById('ordenMovimientos')?.value || 'fecha-desc';
             const filtro = document.getElementById('filtroTipo')?.value || 'todos';
+            const filtroFamilia = document.getElementById('filtroFamilia')?.value || 'todos';
+
+            // Actualizar opciones del filtro de familia
+            const selectFamilia = document.getElementById('filtroFamilia');
+            if (selectFamilia) {
+                const valorActual = selectFamilia.value;
+                selectFamilia.innerHTML = `
+                    <option value="todos">Todas</option>
+                    ${estado.familias.map(f => `<option value="${f.id}">${f.nombre}</option>`).join('')}
+                `;
+                selectFamilia.value = valorActual || 'todos';
+            }
 
             let movimientos = [
                 ...estado.aportes.map(a => ({ ...a, tipo: 'aporte' })),
@@ -1886,6 +1904,12 @@
             // Aplicar filtro por tipo
             if (filtro !== 'todos') {
                 movimientos = movimientos.filter(m => m.tipo === filtro);
+            }
+
+            // Aplicar filtro por familia
+            if (filtroFamilia !== 'todos') {
+                const familiaId = parseInt(filtroFamilia);
+                movimientos = movimientos.filter(m => m.familiaId === familiaId);
             }
 
             // Aplicar ordenamiento
