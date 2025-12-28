@@ -1480,15 +1480,15 @@
 
             const resultado = document.getElementById('resultadoCalculadora');
 
-            // Validar que hay datos
-            if (gastoPlaneado <= 0 || familiasParticipantes.length === 0) {
-                resultado.style.display = 'none';
-                return;
-            }
-
             // Calcular
             const saldoActual = calcularSaldoVaquita();
             const totalNecesario = gastoPlaneado + saldoDeseado;
+
+            // Validar que hay datos (permitir gasto 0 si hay saldo deseado)
+            if (totalNecesario <= 0 || familiasParticipantes.length === 0) {
+                resultado.style.display = 'none';
+                return;
+            }
             const montoARecaudar = Math.max(0, totalNecesario - saldoActual);
 
             // Calcular aporte por familia considerando balance actual
