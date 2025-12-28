@@ -746,48 +746,75 @@
             </div>
         </div>
 
-        <!-- Gestionar Familias -->
+        <!-- Calculadora de Aportes -->
         <div class="card">
-            <div class="card-header" onclick="toggleSection('familias')">
-                <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">Familias</h2>
-                <span class="card-toggle" id="toggle-familias">▼</span>
+            <div class="card-header" onclick="toggleSection('calculadora')">
+                <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">🧮 Calculadora de Aportes</h2>
+                <span class="card-toggle" id="toggle-calculadora">▼</span>
             </div>
-            <div class="card-content" id="content-familias">
-                <div class="form-row" style="margin-top: 15px;">
+            <div class="card-content" id="content-calculadora">
+                <p style="color: #666; margin: 15px 0;">
+                    Calcula cuánto debe aportar cada familia para cubrir un gasto y mantener un saldo deseado.
+                </p>
+
+                <div class="form-row">
                     <div class="form-group">
-                        <label>Nombre de la Familia</label>
-                        <input type="text" id="nombreFamilia" placeholder="Ej: Tio Fer, Familia Garcia">
+                        <label>Gasto planeado ($)</label>
+                        <input type="number" id="calcGastoPlaneado" placeholder="Ej: 50000" min="0" oninput="calcularAportesSugeridos()">
                     </div>
-                    <div class="form-group" style="flex: 0; display: flex; align-items: flex-end;">
-                        <button onclick="agregarFamilia()">Agregar</button>
+                    <div class="form-group">
+                        <label>Saldo deseado después ($)</label>
+                        <input type="number" id="calcSaldoDeseado" placeholder="Ej: 10000" min="0" value="0" oninput="calcularAportesSugeridos()">
                     </div>
                 </div>
-                <div id="listaFamilias"></div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dividir aporte:</label>
+                        <div style="display: flex; gap: 15px; margin-top: 10px;">
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="radio" name="calcTipoDivision" value="familia" checked onchange="toggleCalcIntegrantes()"> Por familia
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="radio" name="calcTipoDivision" value="integrante" onchange="toggleCalcIntegrantes()"> Por integrante
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Familias que participan:</label>
+                        <div id="calcFamiliasParticipantes" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"></div>
+                        <button type="button" onclick="seleccionarTodasCalc()" class="btn-secondary" style="margin-top: 10px;">Seleccionar Todas</button>
+                    </div>
+                </div>
+
+                <div class="form-row" id="calcIntegrantesContainer" style="display: none;">
+                    <div class="form-group">
+                        <label>Integrantes por familia:</label>
+                        <div id="calcIntegrantesList" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"></div>
+                    </div>
+                </div>
+
+                <!-- Resultado de la calculadora -->
+                <div id="resultadoCalculadora" style="display: none; margin-top: 20px; padding: 20px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 12px; border: 2px solid #4caf50;">
+                </div>
             </div>
         </div>
 
-        <!-- Gestionar Integrantes -->
+        <!-- Balance por Familia -->
         <div class="card">
-            <div class="card-header" onclick="toggleSection('integrantes')">
-                <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">👥 Integrantes</h2>
-                <span class="card-toggle" id="toggle-integrantes">▼</span>
+            <div class="card-header" onclick="toggleSection('balance')">
+                <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">Balance por Familia</h2>
+                <span class="card-toggle" id="toggle-balance">▼</span>
             </div>
-            <div class="card-content" id="content-integrantes">
-                <p style="color: #666; margin: 15px 0;">Registra a cada persona y asígnale su familia. El conteo de integrantes por familia se actualiza automáticamente.</p>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Nombre del Integrante</label>
-                        <input type="text" id="nombreIntegrante" placeholder="Ej: Juan, María, Pedro">
-                    </div>
-                    <div class="form-group">
-                        <label>Familia</label>
-                        <select id="familiaIntegrante"></select>
-                    </div>
-                    <div class="form-group" style="flex: 0; display: flex; align-items: flex-end;">
-                        <button onclick="agregarIntegrante()">Agregar</button>
-                    </div>
-                </div>
-                <div id="listaIntegrantes"></div>
+            <div class="card-content" id="content-balance">
+                <p style="color: #666; margin: 15px 0;">
+                    <strong>Positivo (+):</strong> Te deben (la familia aporto de mas o pago gastos) |
+                    <strong>Negativo (-):</strong> Te debe (la familia no ha aportado lo suficiente)
+                </p>
+                <div id="balanceFamilias"></div>
             </div>
         </div>
 
@@ -882,78 +909,6 @@
             </div>
         </div>
 
-        <!-- Balance por Familia -->
-        <div class="card">
-            <div class="card-header" onclick="toggleSection('balance')">
-                <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">Balance por Familia</h2>
-                <span class="card-toggle" id="toggle-balance">▼</span>
-            </div>
-            <div class="card-content" id="content-balance">
-                <p style="color: #666; margin: 15px 0;">
-                    <strong>Positivo (+):</strong> Te deben (la familia aporto de mas o pago gastos) |
-                    <strong>Negativo (-):</strong> Te debe (la familia no ha aportado lo suficiente)
-                </p>
-                <div id="balanceFamilias"></div>
-            </div>
-        </div>
-
-        <!-- Calculadora de Aportes -->
-        <div class="card">
-            <div class="card-header" onclick="toggleSection('calculadora')">
-                <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">🧮 Calculadora de Aportes</h2>
-                <span class="card-toggle" id="toggle-calculadora">▼</span>
-            </div>
-            <div class="card-content" id="content-calculadora">
-                <p style="color: #666; margin: 15px 0;">
-                    Calcula cuánto debe aportar cada familia para cubrir un gasto y mantener un saldo deseado.
-                </p>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Gasto planeado ($)</label>
-                        <input type="number" id="calcGastoPlaneado" placeholder="Ej: 50000" min="0" oninput="calcularAportesSugeridos()">
-                    </div>
-                    <div class="form-group">
-                        <label>Saldo deseado después ($)</label>
-                        <input type="number" id="calcSaldoDeseado" placeholder="Ej: 10000" min="0" value="0" oninput="calcularAportesSugeridos()">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Dividir aporte:</label>
-                        <div style="display: flex; gap: 15px; margin-top: 10px;">
-                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="radio" name="calcTipoDivision" value="familia" checked onchange="toggleCalcIntegrantes()"> Por familia
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="radio" name="calcTipoDivision" value="integrante" onchange="toggleCalcIntegrantes()"> Por integrante
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Familias que participan:</label>
-                        <div id="calcFamiliasParticipantes" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"></div>
-                        <button type="button" onclick="seleccionarTodasCalc()" class="btn-secondary" style="margin-top: 10px;">Seleccionar Todas</button>
-                    </div>
-                </div>
-
-                <div class="form-row" id="calcIntegrantesContainer" style="display: none;">
-                    <div class="form-group">
-                        <label>Integrantes por familia:</label>
-                        <div id="calcIntegrantesList" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"></div>
-                    </div>
-                </div>
-
-                <!-- Resultado de la calculadora -->
-                <div id="resultadoCalculadora" style="display: none; margin-top: 20px; padding: 20px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 12px; border: 2px solid #4caf50;">
-                </div>
-            </div>
-        </div>
-
         <!-- Historial de Movimientos -->
         <div class="card">
             <div class="card-header" onclick="toggleSection('historial')">
@@ -981,6 +936,51 @@
                     </div>
                 </div>
                 <div id="historialMovimientos"></div>
+            </div>
+        </div>
+
+        <!-- Gestionar Familias -->
+        <div class="card">
+            <div class="card-header" onclick="toggleSection('familias')">
+                <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">Familias</h2>
+                <span class="card-toggle" id="toggle-familias">▼</span>
+            </div>
+            <div class="card-content" id="content-familias">
+                <div class="form-row" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label>Nombre de la Familia</label>
+                        <input type="text" id="nombreFamilia" placeholder="Ej: Tio Fer, Familia Garcia">
+                    </div>
+                    <div class="form-group" style="flex: 0; display: flex; align-items: flex-end;">
+                        <button onclick="agregarFamilia()">Agregar</button>
+                    </div>
+                </div>
+                <div id="listaFamilias"></div>
+            </div>
+        </div>
+
+        <!-- Gestionar Integrantes -->
+        <div class="card">
+            <div class="card-header" onclick="toggleSection('integrantes')">
+                <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">👥 Integrantes</h2>
+                <span class="card-toggle" id="toggle-integrantes">▼</span>
+            </div>
+            <div class="card-content" id="content-integrantes">
+                <p style="color: #666; margin: 15px 0;">Registra a cada persona y asígnale su familia. El conteo de integrantes por familia se actualiza automáticamente.</p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre del Integrante</label>
+                        <input type="text" id="nombreIntegrante" placeholder="Ej: Juan, María, Pedro">
+                    </div>
+                    <div class="form-group">
+                        <label>Familia</label>
+                        <select id="familiaIntegrante"></select>
+                    </div>
+                    <div class="form-group" style="flex: 0; display: flex; align-items: flex-end;">
+                        <button onclick="agregarIntegrante()">Agregar</button>
+                    </div>
+                </div>
+                <div id="listaIntegrantes"></div>
             </div>
         </div>
 
