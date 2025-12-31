@@ -1026,6 +1026,32 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // Detectar modo por URL (?modo=gasto para modo restringido)
+        const urlParams = new URLSearchParams(window.location.search);
+        const modoRestringido = urlParams.get('modo') === 'gasto';
+
+        // Aplicar modo restringido (ocultar secciones admin)
+        if (modoRestringido) {
+            document.addEventListener('DOMContentLoaded', () => {
+                // Ocultar secciones que no son para invitados
+                const seccionesOcultar = ['calculadora', 'balance', 'historial', 'familias', 'integrantes', 'acciones'];
+                seccionesOcultar.forEach(seccion => {
+                    const content = document.getElementById(`content-${seccion}`);
+                    const header = content?.previousElementSibling;
+                    if (content && header) {
+                        content.parentElement.style.display = 'none';
+                    }
+                });
+                // Ocultar tab de Aporte y mostrar solo Gasto
+                const tabAporte = document.querySelector('.tab[onclick="cambiarTab(\'aporte\')"]');
+                if (tabAporte) tabAporte.style.display = 'none';
+                // Activar tab de Gasto por defecto
+                cambiarTab('gasto');
+                // Cambiar subtítulo
+                document.querySelector('.subtitle').textContent = 'Registro de gastos';
+            });
+        }
+
         // Estado de la aplicacion
         let estado = {
             familias: [],
