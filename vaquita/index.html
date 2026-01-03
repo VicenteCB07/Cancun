@@ -636,6 +636,38 @@
             </div>
         </div>
 
+        <!-- Calculadora por Días de Estancia -->
+        <div class="card">
+            <div class="card-header" onclick="toggleSection('calculadoraDias')">
+                <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">📅 División por Días</h2>
+                <span class="card-toggle" id="toggle-calculadoraDias">▼</span>
+            </div>
+            <div class="card-content collapsed" id="content-calculadoraDias">
+                <p style="color: #666; margin: 15px 0;">
+                    Divide un gasto proporcionalmente según los días de estancia de cada persona.
+                </p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Monto total a dividir ($)</label>
+                        <input type="number" id="diasMontoTotal" placeholder="Ej: 26250" min="0" step="0.01">
+                    </div>
+                </div>
+
+                <div style="margin: 15px 0;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 500;">Personas y días de estancia:</label>
+                    <div id="diasPersonasList"></div>
+                    <button type="button" onclick="agregarPersonaDias()" class="btn-secondary" style="margin-top: 10px;">+ Agregar Persona</button>
+                </div>
+
+                <button onclick="calcularPorDias()" style="margin-top: 10px;">Calcular División</button>
+
+                <!-- Resultado -->
+                <div id="resultadoDias" style="display: none; margin-top: 20px; padding: 20px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 12px; border: 2px solid #2196f3;">
+                </div>
+            </div>
+        </div>
+
         <!-- Balance por Familia -->
         <div class="card">
             <div class="card-header" onclick="toggleSection('balance')">
@@ -1507,6 +1539,116 @@
             if (tipoDivision === 'integrante') {
                 actualizarIntegrantesGasto();
             }
+        }
+
+        // ========== CALCULADORA POR DÍAS ==========
+        let diasPersonasContador = 0;
+
+        function agregarPersonaDias(nombre = '', dias = '') {
+            diasPersonasContador++;
+            const id = diasPersonasContador;
+            const container = document.getElementById('diasPersonasList');
+
+            const div = document.createElement('div');
+            div.id = `diasPersona_${id}`;
+            div.style.cssText = 'display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;';
+            div.innerHTML = `
+                <input type="text" id="diasNombre_${id}" value="${nombre}" placeholder="Nombre"
+                    style="flex: 1; min-width: 120px; padding: 8px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                <input type="number" id="diasCantidad_${id}" value="${dias}" placeholder="Días" min="0"
+                    style="width: 80px; padding: 8px; border: 2px solid #e0e0e0; border-radius: 8px; text-align: center;">
+                <button type="button" onclick="eliminarPersonaDias(${id})" class="btn-danger" style="padding: 8px 12px;">✕</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function eliminarPersonaDias(id) {
+            const div = document.getElementById(`diasPersona_${id}`);
+            if (div) div.remove();
+        }
+
+        function calcularPorDias() {
+            const montoTotal = parseFloat(document.getElementById('diasMontoTotal').value) || 0;
+            const resultado = document.getElementById('resultadoDias');
+
+            if (montoTotal <= 0) {
+                resultado.style.display = 'none';
+                alert('Ingresa un monto total válido');
+                return;
+            }
+
+            // Recopilar personas y días
+            const personas = [];
+            const contenedor = document.getElementById('diasPersonasList');
+            const filas = contenedor.querySelectorAll('[id^="diasPersona_"]');
+
+            filas.forEach(fila => {
+                const id = fila.id.replace('diasPersona_', '');
+                const nombre = document.getElementById(`diasNombre_${id}`)?.value.trim();
+                const dias = parseInt(document.getElementById(`diasCantidad_${id}`)?.value) || 0;
+
+                if (nombre && dias > 0) {
+                    personas.push({ nombre, dias });
+                }
+            });
+
+            if (personas.length === 0) {
+                resultado.style.display = 'none';
+                alert('Agrega al menos una persona con días válidos');
+                return;
+            }
+
+            // Calcular
+            const totalDias = personas.reduce((sum, p) => sum + p.dias, 0);
+            const costoPorDia = montoTotal / totalDias;
+
+            // Calcular aportación por persona
+            const aportes = personas.map(p => ({
+                nombre: p.nombre,
+                dias: p.dias,
+                aporte: costoPorDia * p.dias
+            }));
+
+            // Mostrar resultado
+            resultado.style.display = 'block';
+            resultado.innerHTML = `
+                <h3 style="color: #1565c0; margin-bottom: 15px;">📊 Resultado</h3>
+
+                <div style="display: grid; gap: 10px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; padding: 8px; background: white; border-radius: 8px;">
+                        <span>Monto total:</span>
+                        <strong>${formatearMoneda(montoTotal)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px; background: white; border-radius: 8px;">
+                        <span>Total días acumulados:</span>
+                        <strong>${totalDias} días</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 10px; background: #fff3e0; border-radius: 8px;">
+                        <span><strong>Costo por día:</strong></span>
+                        <strong style="color: #e65100;">${formatearMoneda(costoPorDia)}</strong>
+                    </div>
+                </div>
+
+                <h4 style="color: #1565c0; margin-bottom: 10px;">💰 Aportación por persona</h4>
+                <div style="display: grid; gap: 10px;">
+                    ${aportes.map(a => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #2196f3;">
+                            <span>
+                                <strong>${a.nombre}</strong>
+                                <span style="color: #666; font-size: 0.9em;">(${a.dias} días)</span>
+                            </span>
+                            <strong style="color: #1565c0; font-size: 1.2em;">${formatearMoneda(a.aporte)}</strong>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div style="margin-top: 15px; padding: 12px; background: #c8e6c9; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span><strong>✓ Validación - Total:</strong></span>
+                        <strong style="color: #2e7d32;">${formatearMoneda(aportes.reduce((sum, a) => sum + a.aporte, 0))}</strong>
+                    </div>
+                </div>
+            `;
         }
 
         // Eliminar movimiento
