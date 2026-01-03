@@ -644,7 +644,7 @@
             </div>
             <div class="card-content collapsed" id="content-calculadoraDias">
                 <p style="color: #666; margin: 15px 0;">
-                    Divide un gasto proporcionalmente según los días de estancia de cada persona.
+                    Divide un gasto proporcionalmente según los días de estancia de cada familia, considerando su balance actual.
                 </p>
 
                 <div class="form-row">
@@ -655,9 +655,8 @@
                 </div>
 
                 <div style="margin: 15px 0;">
-                    <label style="display: block; margin-bottom: 10px; font-weight: 500;">Personas y días de estancia:</label>
-                    <div id="diasPersonasList"></div>
-                    <button type="button" onclick="agregarPersonaDias()" class="btn-secondary" style="margin-top: 10px;">+ Agregar Persona</button>
+                    <label style="display: block; margin-bottom: 10px; font-weight: 500;">Días de estancia por familia:</label>
+                    <div id="diasFamiliasList"></div>
                 </div>
 
                 <button onclick="calcularPorDias()" style="margin-top: 10px;">Calcular División</button>
@@ -1542,29 +1541,29 @@
         }
 
         // ========== CALCULADORA POR DÍAS ==========
-        let diasPersonasContador = 0;
 
-        function agregarPersonaDias(nombre = '', dias = '') {
-            diasPersonasContador++;
-            const id = diasPersonasContador;
-            const container = document.getElementById('diasPersonasList');
+        // Actualizar lista de familias para calculadora de días
+        function actualizarDiasFamiliasList() {
+            const container = document.getElementById('diasFamiliasList');
+            if (!container) return;
 
-            const div = document.createElement('div');
-            div.id = `diasPersona_${id}`;
-            div.style.cssText = 'display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;';
-            div.innerHTML = `
-                <input type="text" id="diasNombre_${id}" value="${nombre}" placeholder="Nombre"
-                    style="flex: 1; min-width: 120px; padding: 8px; border: 2px solid #e0e0e0; border-radius: 8px;">
-                <input type="number" id="diasCantidad_${id}" value="${dias}" placeholder="Días" min="0"
-                    style="width: 80px; padding: 8px; border: 2px solid #e0e0e0; border-radius: 8px; text-align: center;">
-                <button type="button" onclick="eliminarPersonaDias(${id})" class="btn-danger" style="padding: 8px 12px;">✕</button>
-            `;
-            container.appendChild(div);
-        }
+            container.innerHTML = estado.familias.map(f => {
+                const balance = calcularBalanceFamilia(f.id);
+                const balanceTexto = balance.balance >= 0 ? `+${formatearMoneda(balance.balance)}` : formatearMoneda(balance.balance);
+                const balanceColor = balance.balance >= 0 ? '#2e7d32' : '#c62828';
+                const nombreCorto = f.nombre.replace(/\s*\(\+\d+\)$/, '');
 
-        function eliminarPersonaDias(id) {
-            const div = document.getElementById(`diasPersona_${id}`);
-            if (div) div.remove();
+                return `
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; padding: 10px; background: #f5f5f5; border-radius: 8px;">
+                        <span style="flex: 1; min-width: 120px;">
+                            <strong>${nombreCorto}</strong>
+                            <span style="font-size: 0.85em; color: ${balanceColor};">(Balance: ${balanceTexto})</span>
+                        </span>
+                        <input type="number" id="diasFamilia_${f.id}" placeholder="Días" min="0" value="0"
+                            style="width: 80px; padding: 8px; border: 2px solid #e0e0e0; border-radius: 8px; text-align: center;">
+                    </div>
+                `;
+            }).join('');
         }
 
         function calcularPorDias() {
@@ -1577,37 +1576,47 @@
                 return;
             }
 
-            // Recopilar personas y días
-            const personas = [];
-            const contenedor = document.getElementById('diasPersonasList');
-            const filas = contenedor.querySelectorAll('[id^="diasPersona_"]');
-
-            filas.forEach(fila => {
-                const id = fila.id.replace('diasPersona_', '');
-                const nombre = document.getElementById(`diasNombre_${id}`)?.value.trim();
-                const dias = parseInt(document.getElementById(`diasCantidad_${id}`)?.value) || 0;
-
-                if (nombre && dias > 0) {
-                    personas.push({ nombre, dias });
+            // Recopilar familias y días
+            const familias = [];
+            estado.familias.forEach(f => {
+                const dias = parseInt(document.getElementById(`diasFamilia_${f.id}`)?.value) || 0;
+                if (dias > 0) {
+                    const balance = calcularBalanceFamilia(f.id);
+                    const nombreCorto = f.nombre.replace(/\s*\(\+\d+\)$/, '');
+                    familias.push({
+                        id: f.id,
+                        nombre: nombreCorto,
+                        dias: dias,
+                        balance: balance.balance
+                    });
                 }
             });
 
-            if (personas.length === 0) {
+            if (familias.length === 0) {
                 resultado.style.display = 'none';
-                alert('Agrega al menos una persona con días válidos');
+                alert('Ingresa días para al menos una familia');
                 return;
             }
 
             // Calcular
-            const totalDias = personas.reduce((sum, p) => sum + p.dias, 0);
+            const totalDias = familias.reduce((sum, f) => sum + f.dias, 0);
             const costoPorDia = montoTotal / totalDias;
 
-            // Calcular aportación por persona
-            const aportes = personas.map(p => ({
-                nombre: p.nombre,
-                dias: p.dias,
-                aporte: costoPorDia * p.dias
-            }));
+            // Calcular aportación por familia considerando balance
+            const aportes = familias.map(f => {
+                const cuotaPorDias = costoPorDia * f.dias;
+                const aporteAjustado = Math.max(0, cuotaPorDias - f.balance);
+                return {
+                    nombre: f.nombre,
+                    dias: f.dias,
+                    cuotaPorDias: cuotaPorDias,
+                    balance: f.balance,
+                    aporte: aporteAjustado
+                };
+            });
+
+            const totalAportes = aportes.reduce((sum, a) => sum + a.aporte, 0);
+            const totalCuotas = aportes.reduce((sum, a) => sum + a.cuotaPorDias, 0);
 
             // Mostrar resultado
             resultado.style.display = 'block';
@@ -1629,23 +1638,38 @@
                     </div>
                 </div>
 
-                <h4 style="color: #1565c0; margin-bottom: 10px;">💰 Aportación por persona</h4>
+                <h4 style="color: #1565c0; margin-bottom: 10px;">💰 Aportación por familia (ajustada con balance)</h4>
                 <div style="display: grid; gap: 10px;">
-                    ${aportes.map(a => `
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #2196f3;">
-                            <span>
-                                <strong>${a.nombre}</strong>
-                                <span style="color: #666; font-size: 0.9em;">(${a.dias} días)</span>
-                            </span>
-                            <strong style="color: #1565c0; font-size: 1.2em;">${formatearMoneda(a.aporte)}</strong>
+                    ${aportes.map(a => {
+                        const balanceTexto = a.balance >= 0 ? `+${formatearMoneda(a.balance)}` : formatearMoneda(a.balance);
+                        const balanceColor = a.balance >= 0 ? '#2e7d32' : '#c62828';
+                        return `
+                        <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #2196f3;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span>
+                                    <strong>${a.nombre}</strong>
+                                    <span style="color: #666; font-size: 0.9em;">(${a.dias} días)</span>
+                                </span>
+                                <strong style="color: #1565c0; font-size: 1.2em;">${formatearMoneda(a.aporte)}</strong>
+                            </div>
+                            <div style="font-size: 0.8em; color: #666;">
+                                Cuota por días: ${formatearMoneda(a.cuotaPorDias)} − Balance: <span style="color: ${balanceColor};">${balanceTexto}</span>
+                            </div>
                         </div>
-                    `).join('')}
+                    `}).join('')}
                 </div>
 
-                <div style="margin-top: 15px; padding: 12px; background: #c8e6c9; border-radius: 8px;">
+                <div style="margin-top: 15px; padding: 12px; background: #e3f2fd; border-radius: 8px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span><strong>✓ Validación - Total:</strong></span>
-                        <strong style="color: #2e7d32;">${formatearMoneda(aportes.reduce((sum, a) => sum + a.aporte, 0))}</strong>
+                        <span><strong>Total cuotas (sin ajuste):</strong></span>
+                        <strong style="color: #1565c0;">${formatearMoneda(totalCuotas)}</strong>
+                    </div>
+                </div>
+
+                <div style="margin-top: 10px; padding: 12px; background: #c8e6c9; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span><strong>✓ Total a recaudar (ajustado):</strong></span>
+                        <strong style="color: #2e7d32;">${formatearMoneda(totalAportes)}</strong>
                     </div>
                 </div>
             `;
@@ -1800,6 +1824,9 @@
                     ${getNombreFamiliaConConteo(f)}
                 </label>
             `).join('');
+
+            // Lista de familias para calculadora por días
+            actualizarDiasFamiliasList();
 
             // Lista de familias
             if (estado.familias.length === 0) {
